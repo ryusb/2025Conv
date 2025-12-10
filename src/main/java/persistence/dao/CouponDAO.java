@@ -71,4 +71,34 @@ public class CouponDAO {
             return false;
         }
     }
+
+    public persistence.dto.CouponDTO findById(int couponId) {
+        String sql = "SELECT * FROM coupon WHERE coupon_id = ?";
+        persistence.dto.CouponDTO coupon = null;
+
+        try (java.sql.Connection conn = network.DBConnectionManager.getConnection();
+             java.sql.PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, couponId);
+
+            try (java.sql.ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    coupon = new persistence.dto.CouponDTO();
+                    coupon.setCouponId(rs.getInt("coupon_id"));
+                    coupon.setUserId(rs.getInt("user_id"));
+
+                    // Timestamp -> LocalDateTime 변환
+                    java.sql.Timestamp ts = rs.getTimestamp("purchase_date");
+                    if (ts != null) coupon.setPurchaseDate(ts.toLocalDateTime());
+
+                    coupon.setPurchaseValue(rs.getInt("purchase_value")); // 구매 당시 가치
+                    coupon.setUsed(rs.getBoolean("is_used"));
+                }
+            }
+        } catch (java.sql.SQLException e) {
+            System.err.println("CouponDAO - 쿠폰 조회 중 DB 오류: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return coupon;
+    }
 }

@@ -6,6 +6,8 @@ import persistence.dto.DTO;
 @Getter
 @Setter
 public class Protocol {
+    public static final int HEADER_SIZE = 6;
+
     private byte type;
     private byte code;
     private int dataLength;
@@ -26,6 +28,7 @@ public class Protocol {
         byte[] dataByteArray = new byte[0];
         if (data != null) {
             try {
+                // Serializer는 외부 구현에 의존
                 dataByteArray = Serializer.getBytes(data);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -52,15 +55,17 @@ public class Protocol {
             return null;
         }
 
-        // 요청/응답만 직렬화/역직렬화 대상
-        if (arr == null || arr.length == 0) {
-            return null;
-        }
-        if (type == ProtocolType.REQUEST || type == ProtocolType.RESPONSE) {
+        else if (type == ProtocolType.RESPONSE) {
             return (DTO) Deserializer.getObject(arr);
         }
 
-        // 정의되지 않은 타입은 null 처리
+        else if (type == ProtocolType.RESULT) {
+            // 0x50 ~ 0x5F 사이의 코드는 모두 Result 코드로 인정하여 null 반환
+            // SUCCESS(0x50) ~ SERVER_ERROR(0x5F)
+            if (code >= ProtocolCode.SUCCESS && code <= ProtocolCode.SERVER_ERROR) {
+                return null;
+            }
+        }
         return null;
     }
 
@@ -76,7 +81,8 @@ public class Protocol {
         dataLength = Deserializer.byteArrayToInt(dataLengthByteArray);
 
         byte[] dataArray = new byte[dataLength];
-        System.arraycopy(arr, 2 + INT_LENGTH, dataArray, 0, dataLength); pos += dataLength;
+        // dataLength는 arr[2]부터 arr[5]에 있으므로, data는 arr[6]부터 시작합니다.
+        System.arraycopy(arr, HEADER_SIZE, dataArray, 0, dataLength); pos += dataLength;
         try {
             data = byteArrayToData(type, code, dataArray);
         }
