@@ -12,7 +12,6 @@ import util.OutputHandler;
 import java.util.List;
 
 public class CouponService {
-
     // 잔여 쿠폰 조회
     public static void remainCoupon() {
         int userId = UserSession.getUserId();
@@ -25,6 +24,11 @@ public class CouponService {
         if (response.getCode() == ProtocolCode.COUPON_LIST_RESPONSE) {
             List<CouponDTO> list = (List<CouponDTO>) response.getData();
 
+            if (list == null || list.isEmpty()) {
+                OutputHandler.showMessage("잔여 쿠폰이 없습니다.");
+                return;
+            }
+
             OutputHandler.showBar();
             OutputHandler.showTitle(userId + "님의 쿠폰");
 
@@ -32,6 +36,8 @@ public class CouponService {
                 OutputHandler.showMessage(c.getPurchaseValue() + "원");
             }
             OutputHandler.showBar();
+        } else {
+            OutputHandler.showError("쿠폰 조회 실패");
         }
     }
 
@@ -47,13 +53,16 @@ public class CouponService {
         Protocol policyRes =
                 NetworkClient.sendRequest(ProtocolCode.COUPON_POLICY_LIST_REQUEST, null);
 
-        List<CouponPolicyDTO> policies =
-                (List<CouponPolicyDTO>) policyRes.getData();
+        List<CouponPolicyDTO> policies = (List<CouponPolicyDTO>) policyRes.getData();
+
+        // null 또는 빈 리스트 체크
+        if (policies == null || policies.isEmpty()) {
+            OutputHandler.showError("쿠폰 정책이 없습니다.");
+            return;
+        }
 
         CouponPolicyDTO latest = policies.get(policies.size() - 1);
-
-        // 🔥 필드명 수정 (getPrice → getCouponPrice)
-        int price = latest.getCouponPrice();
+        int price = latest.getCouponPrice(); // CouponPolicyDTO 필드명
 
         OutputHandler.showMessage("장당 쿠폰 가격: " + price + "원");
         OutputHandler.showMessage("총 결제 금액: " + (price * quantity) + "원");
@@ -91,15 +100,16 @@ public class CouponService {
         if (response.getCode() == ProtocolCode.ORDER_PAYMENT_HISTORY_RESPONSE) {
             List<PaymentDTO> list = (List<PaymentDTO>) response.getData();
 
+            if (list == null || list.isEmpty()) {
+                OutputHandler.showMessage("결제 내역이 없습니다.");
+                return;
+            }
+
             OutputHandler.showTitle("쿠폰 결제 내역");
 
             for (PaymentDTO p : list) {
-                // 🔥 수정: 가격은 menuPriceAtTime 사용
-                System.out.println(
-                        p.getMenuName() + " - " + p.getMenuPriceAtTime() + "원"
-                );
+                System.out.println(p.getMenuName() + " - " + p.getMenuPriceAtTime() + "원");
             }
-
         } else {
             OutputHandler.showError("내역 조회 실패");
         }

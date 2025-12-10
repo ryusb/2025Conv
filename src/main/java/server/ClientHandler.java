@@ -100,7 +100,8 @@ public class ClientHandler extends Thread {
 
                 case ProtocolCode.MENU_LIST_REQUEST: { // 0x03
                     // 예: 1번 식당, 점심 메뉴 조회 (클라이언트 데이터에 따라 동적 처리 가능)
-                    List<MenuPriceDTO> menus = menuController.getMenus(1, "점심");
+                    MenuPriceDTO menuPriceDTO = (MenuPriceDTO) req.getData();
+                    List<MenuPriceDTO> menus = menuController.getMenus(menuPriceDTO.getRestaurantId(), menuPriceDTO.getMealTime());
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_LIST_RESPONSE, menus);
                 }
 
