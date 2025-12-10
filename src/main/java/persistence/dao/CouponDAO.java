@@ -57,17 +57,24 @@ public class CouponDAO {
     // 2. 특정 쿠폰을 사용 처리합니다.
     public boolean updateCouponToUsed(int couponId) {
         String sql = "UPDATE coupon SET is_used = TRUE WHERE coupon_id = ?";
+        return executeUpdate(sql, couponId);
+    }
 
+    // 3. 쿠폰 사용을 취소(롤백)합니다. (FALSE로 변경)
+    public boolean updateCouponToUnused(int couponId) {
+        String sql = "UPDATE coupon SET is_used = FALSE WHERE coupon_id = ?";
+        return executeUpdate(sql, couponId);
+    }
+
+    // 중복 코드 제거를 위한 헬퍼 메서드
+    private boolean executeUpdate(String sql, int couponId) {
         try (Connection conn = DBConnectionManager.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-
             pstmt.setInt(1, couponId);
             int rowsAffected = pstmt.executeUpdate();
             return rowsAffected > 0;
-
         } catch (SQLException e) {
-            System.err.println("CouponDAO - 쿠폰 사용 처리 중 DB 오류: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("CouponDAO - 상태 업데이트 오류: " + e.getMessage());
             return false;
         }
     }

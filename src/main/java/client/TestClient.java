@@ -36,54 +36,36 @@ public class TestClient {
             is = socket.getInputStream();
             os = socket.getOutputStream();
 
-            System.out.println("🎉 [TestClient] 서버에 연결되었습니다.");
+            System.out.println("🎉 [TestClient] 서버 연결 성공!");
 
-            // 1. 먼저 로그인 수행
-            if (!login()) {
-                System.out.println("❌ 로그인 실패로 프로그램을 종료합니다.");
-                return;
-            }
-
-            // 2. 기능 테스트 메뉴 실행
+            // 1. 로그인 루프 (성공할 때까지 or 종료)
             while (true) {
-                printMainMenu();
-                int choice = getIntInput();
+                if (currentUser == null) {
+                    System.out.println("\n=== [시스템 접속] ===");
+                    System.out.println("1. 로그인  0. 종료");
+                    System.out.print("선택>> ");
+                    int choice = getIntInput();
 
-                if (choice == 0) break;
-
-                try {
-                    switch (choice) {
-                        // --- 사용자 기능 ---
-                        case 1: testMenuList(); break;
-                        case 2: testMenuImageDownload(); break;
-                        case 3: testCouponList(); break;
-                        case 4: testCouponPurchase(); break;
-                        case 5: testPayment(ProtocolCode.PAYMENT_CARD_REQUEST); break;
-                        case 6: testPayment(ProtocolCode.PAYMENT_COUPON_REQUEST); break;
-                        case 7: testUsageHistory(); break;
-
-                        // --- 관리자 기능 ---
-                        case 10: testMenuInsert(); break;
-                        case 11: testMenuUpdate(); break;
-                        case 12: testMenuImageRegister(); break;
-                        case 13: testPriceRegister(ProtocolCode.PRICE_REGISTER_SNACK_REQUEST); break;
-                        case 14: testPriceRegister(ProtocolCode.PRICE_REGISTER_REGULAR_REQUEST); break;
-                        case 15: testCouponPolicyList(); break;
-                        case 16: testCouponPolicyInsert(); break;
-                        case 17: testOrderPaymentHistory(); break;
-                        case 18: testSalesReport(); break;
-                        case 19: testUsageReport(); break;
-                        case 20: testCsvSampleDownload(); break;
-                        case 21: testCsvUpload(); break;
-
-                        default: System.out.println("잘못된 선택입니다.");
+                    if (choice == 0) {
+                        System.out.println("프로그램을 종료합니다.");
+                        break;
                     }
-                } catch (Exception e) {
-                    System.out.println("⚠️ 테스트 중 에러 발생: " + e.getMessage());
-                    e.printStackTrace();
+                    if (choice == 1) {
+                        login();
+                    }
+                } else {
+                    // 2. 권한별 메뉴 분기
+                    String role = currentUser.getUserType(); // "admin" or "학생"/"교직원"
+
+                    // DB에 "admin"으로 저장되어 있는지 "관리자"로 저장되어 있는지에 따라 조건 수정 필요
+                    // 여기서는 'admin' 문자열을 포함하거나 '관리자'인 경우 관리자로 취급
+                    if ("admin".equalsIgnoreCase(role) || "관리자".equals(role)) {
+                        handleAdminMenu();
+                    } else {
+                        handleUserMenu();
+                    }
                 }
             }
-
         } catch (IOException e) {
             System.err.println("❌ 서버 연결 실패: " + e.getMessage());
         } finally {
@@ -92,12 +74,176 @@ public class TestClient {
     }
 
     // ===============================================================
-    // [기능별 테스트 메서드]
+    // [메뉴 핸들링 로직]
+    // ===============================================================
+
+    /**
+     * 일반 사용자용 메인 메뉴
+     */
+    private static void handleUserMenu() {
+        while (currentUser != null) {
+            System.out.println("\n================ [사용자 메뉴] ================");
+            System.out.println(" 1. 메뉴 목록 조회      2. 메뉴 이미지 다운로드");
+            System.out.println(" 3. 내 쿠폰 조회        4. 쿠폰 구매");
+            System.out.println(" 5. 카드 결제           6. 쿠폰 결제");
+            System.out.println(" 7. 이용 내역 조회");
+            System.out.println(" 0. 로그아웃");
+            System.out.print("선택>> ");
+
+            int choice = getIntInput();
+            try {
+                switch (choice) {
+                    case 1: testMenuList(); break;
+                    case 2: testMenuImageDownload(); break;
+                    case 3: testCouponList(); break;
+                    case 4: testCouponPurchase(); break;
+                    case 5: testPayment(ProtocolCode.PAYMENT_CARD_REQUEST); break;
+                    case 6: testPayment(ProtocolCode.PAYMENT_COUPON_REQUEST); break;
+                    case 7: testUsageHistory(); break;
+                    case 0:
+                        System.out.println("로그아웃 되었습니다.");
+                        currentUser = null;
+                        return;
+                    default: System.out.println("잘못된 선택입니다.");
+                }
+            } catch (Exception e) {
+                System.out.println("⚠️ 에러: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 관리자용 메인 메뉴 (카테고리화)
+     */
+    private static void handleAdminMenu() {
+        while (currentUser != null) {
+            System.out.println("\n================ [관리자 메뉴] ================");
+            System.out.println(" 1. 메뉴 관리 (등록/수정/사진)");
+            System.out.println(" 2. 가격 책정 (분식/일반)");
+            System.out.println(" 3. 쿠폰 정책 관리");
+            System.out.println(" 4. 통계 및 보고서");
+            System.out.println(" 5. 데이터 관리 (CSV)");
+            System.out.println(" 0. 로그아웃");
+            System.out.print("선택>> ");
+
+            int choice = getIntInput();
+            try {
+                switch (choice) {
+                    case 1: handleMenuManagement(); break;
+                    case 2: handlePriceManagement(); break;
+                    case 3: handleCouponPolicy(); break;
+                    case 4: handleReports(); break;
+                    case 5: handleDataManagement(); break;
+                    case 0:
+                        System.out.println("로그아웃 되었습니다.");
+                        currentUser = null;
+                        return;
+                    default: System.out.println("잘못된 선택입니다.");
+                }
+            } catch (Exception e) {
+                System.out.println("⚠️ 에러: " + e.getMessage());
+            }
+        }
+    }
+
+    // --- 관리자 하위 메뉴 ---
+
+    private static void handleMenuManagement() throws IOException {
+        while (true) {
+            System.out.println("\n--- [관리자 > 메뉴 관리] ---");
+            System.out.println(" 1. 메뉴 신규 등록");
+            System.out.println(" 2. 메뉴 정보 수정 (이름/가격)");
+            System.out.println(" 3. 메뉴 사진 등록");
+            System.out.println(" 0. 뒤로가기");
+            System.out.print("선택>> ");
+            int c = getIntInput();
+            if (c == 0) return;
+            switch (c) {
+                case 1: testMenuInsert(); break;
+                case 2: testMenuUpdate(); break;
+                case 3: testMenuImageRegister(); break;
+                default: System.out.println("잘못된 선택");
+            }
+        }
+    }
+
+    private static void handlePriceManagement() throws IOException {
+        while (true) {
+            System.out.println("\n--- [관리자 > 가격 책정] ---");
+            System.out.println(" 1. 분식당 개별 가격 등록");
+            System.out.println(" 2. 일반식당(학식/교직원) 일괄 가격 등록");
+            System.out.println(" 0. 뒤로가기");
+            System.out.print("선택>> ");
+            int c = getIntInput();
+            if (c == 0) return;
+            switch (c) {
+                case 1: testPriceRegister(ProtocolCode.PRICE_REGISTER_SNACK_REQUEST); break;
+                case 2: testPriceRegister(ProtocolCode.PRICE_REGISTER_REGULAR_REQUEST); break;
+                default: System.out.println("잘못된 선택");
+            }
+        }
+    }
+
+    private static void handleCouponPolicy() throws IOException {
+        while (true) {
+            System.out.println("\n--- [관리자 > 쿠폰 정책] ---");
+            System.out.println(" 1. 정책 목록 조회");
+            System.out.println(" 2. 신규 정책 생성");
+            System.out.println(" 0. 뒤로가기");
+            System.out.print("선택>> ");
+            int c = getIntInput();
+            if (c == 0) return;
+            switch (c) {
+                case 1: testCouponPolicyList(); break;
+                case 2: testCouponPolicyInsert(); break;
+                default: System.out.println("잘못된 선택");
+            }
+        }
+    }
+
+    private static void handleReports() throws IOException {
+        while (true) {
+            System.out.println("\n--- [관리자 > 통계/보고서] ---");
+            System.out.println(" 1. 식당별 결제 내역 상세");
+            System.out.println(" 2. 식당별 매출 현황");
+            System.out.println(" 3. 시간대별 이용 통계");
+            System.out.println(" 0. 뒤로가기");
+            System.out.print("선택>> ");
+            int c = getIntInput();
+            if (c == 0) return;
+            switch (c) {
+                case 1: testOrderPaymentHistory(); break;
+                case 2: testSalesReport(); break;
+                case 3: testUsageReport(); break;
+                default: System.out.println("잘못된 선택");
+            }
+        }
+    }
+
+    private static void handleDataManagement() throws IOException {
+        while (true) {
+            System.out.println("\n--- [관리자 > CSV 데이터] ---");
+            System.out.println(" 1. 샘플 파일 다운로드");
+            System.out.println(" 2. 메뉴 일괄 업로드 (CSV)");
+            System.out.println(" 0. 뒤로가기");
+            System.out.print("선택>> ");
+            int c = getIntInput();
+            if (c == 0) return;
+            switch (c) {
+                case 1: testCsvSampleDownload(); break;
+                case 2: testCsvUpload(); break;
+                default: System.out.println("잘못된 선택");
+            }
+        }
+    }
+
+    // ===============================================================
+    // [기능 구현 메서드]
     // ===============================================================
 
     // 1. 로그인 (필수)
     private static boolean login() throws IOException {
-        System.out.println("\n=== [로그인] ===");
+        System.out.println("\n=== [로그인 정보 입력] ===");
         System.out.print("ID: ");
         String id = sc.nextLine();
         System.out.print("PW: ");
@@ -112,14 +258,15 @@ public class TestClient {
 
         if (res.getCode() == ProtocolCode.LOGIN_RESPONSE) {
             currentUser = (UserDTO) res.getData();
-            System.out.println("✅ 로그인 성공! (권한: " + currentUser.getUserType() + ", ID: " + currentUser.getUserId() + ")");
+            System.out.println("✅ 로그인 성공! (" + currentUser.getUserType() + "님 환영합니다)");
             return true;
         } else {
-            System.out.println("❌ 로그인 실패 (Code: 0x" + Integer.toHexString(res.getCode()) + ")");
+            System.out.println("❌ 로그인 실패: 아이디 또는 비밀번호를 확인하세요.");
             return false;
         }
     }
 
+    // --- 사용자 기능 ---
     // 0x03: 메뉴 목록 조회
     private static void testMenuList() throws IOException {
         System.out.println("\n[메뉴 목록 조회]");
@@ -136,8 +283,7 @@ public class TestClient {
             List<MenuPriceDTO> list = (List<MenuPriceDTO>) res.getData();
             System.out.println("📋 메뉴 목록 (" + list.size() + "개):");
             for (MenuPriceDTO m : list) {
-                System.out.printf("- [%d] %s (%d원/%d원)\n", m.getMenuPriceId(), m.getMenuName(), m.getPriceStu(), m.getPriceFac());
-            }
+                System.out.printf("- [%d] %s (학생:%d / 직원:%d)\n", m.getMenuPriceId(), m.getMenuName(), m.getPriceStu(), m.getPriceFac());            }
         } else {
             printFail(res);
         }
@@ -146,12 +292,10 @@ public class TestClient {
     // 0x04: 메뉴 이미지 다운로드
     private static void testMenuImageDownload() throws IOException {
         System.out.println("\n[메뉴 이미지 다운로드]");
-        System.out.print("메뉴 ID: ");
+        System.out.print("다운로드할 메뉴 ID: ");
         int menuId = getIntInput();
-
         send(new Protocol(ProtocolType.REQUEST, ProtocolCode.MENU_IMAGE_DOWNLOAD_REQUEST, menuId));
         Protocol res = receive();
-
         if (res.getCode() == ProtocolCode.MENU_IMAGE_RESPONSE) {
             byte[] imgData = (byte[]) res.getData();
             String fileName = "downloaded_menu_" + menuId + ".jpg";
@@ -166,10 +310,10 @@ public class TestClient {
     private static void testCouponList() throws IOException {
         send(new Protocol(ProtocolType.REQUEST, ProtocolCode.COUPON_LIST_REQUEST, currentUser.getUserId()));
         Protocol res = receive();
-
         if (res.getCode() == ProtocolCode.COUPON_LIST_RESPONSE) {
             List<CouponDTO> list = (List<CouponDTO>) res.getData();
-            System.out.println("🎟️ 보유 쿠폰 (" + list.size() + "장):");
+            System.out.println("🎟️ 내 쿠폰 목록:");
+            System.out.println("보유 쿠폰 (" + list.size() + "장):");
             for(CouponDTO c : list) {
                 System.out.printf("- ID:%d, 가액:%d원, 구매일:%s\n", c.getCouponId(), c.getPurchaseValue(), c.getPurchaseDate());
             }
@@ -190,32 +334,40 @@ public class TestClient {
 
     // 0x07, 0x08: 결제 (카드/쿠폰)
     private static void testPayment(byte code) throws IOException {
-        System.out.println("\n[결제 요청 - " + (code == ProtocolCode.PAYMENT_CARD_REQUEST ? "카드" : "쿠폰") + "]");
+        System.out.println(code == ProtocolCode.PAYMENT_CARD_REQUEST ? "[카드 결제]" : "[쿠폰 결제]");
         PaymentDTO pay = new PaymentDTO();
         pay.setUserId(currentUser.getUserId());
         pay.setUserType(currentUser.getUserType());
-
-        System.out.print("메뉴 ID: ");
-        pay.setMenuPriceId(getIntInput());
-
+        System.out.print("메뉴 ID: "); pay.setMenuPriceId(getIntInput());
         if (code == ProtocolCode.PAYMENT_COUPON_REQUEST) {
-            System.out.print("사용할 쿠폰 ID (본인 소유): ");
-            pay.setUsedCouponId(getIntInput());
+            System.out.print("사용할 쿠폰 ID: "); pay.setUsedCouponId(getIntInput());
         }
 
         send(new Protocol(ProtocolType.REQUEST, code, pay));
-        printSimpleResult(receive());
+        Protocol res = receive();
+
+        if (res.getCode() == ProtocolCode.SUCCESS) {
+            System.out.println("✅ 결제 성공!");
+            if (res.getData() instanceof PaymentDTO) {
+                PaymentDTO result = (PaymentDTO) res.getData();
+                System.out.println("   - 상태: " + result.getStatus());
+                System.out.println("   - 메뉴 가격: " + result.getMenuPriceAtTime() + "원");
+                System.out.println("   - 쿠폰 사용: " + result.getCouponValueUsed() + "원");
+                System.out.println("   - 추가 결제: " + result.getAdditionalCardAmount() + "원");
+            }
+        } else {
+            printFail(res);
+        }
     }
 
     // 0x09: 이용 내역 조회
     private static void testUsageHistory() throws IOException {
         send(new Protocol(ProtocolType.REQUEST, ProtocolCode.USAGE_HISTORY_REQUEST, currentUser.getUserId()));
         Protocol res = receive();
-
         if(res.getCode() == ProtocolCode.USAGE_HISTORY_RESPONSE) {
             List<PaymentDTO> list = (List<PaymentDTO>) res.getData();
             System.out.println("📜 이용 내역:");
-            for(PaymentDTO p : list) System.out.println("- " + p.getMenuName() + " (" + p.getPaymentTime() + ") : " + p.getStatus());
+            for(PaymentDTO p : list) System.out.printf("- %s (%d원) %s\n", p.getMenuName(), p.getMenuPriceAtTime(), p.getPaymentTime());
         } else printFail(res);
     }
 
@@ -228,12 +380,21 @@ public class TestClient {
         System.out.print("식당 ID: "); m.setRestaurantId(getIntInput());
         System.out.print("식당 이름: "); m.setRestaurantName(sc.nextLine());
         System.out.print("메뉴명: "); m.setMenuName(sc.nextLine());
-        System.out.print("시간대(점심 등): "); m.setMealTime(sc.nextLine());
+        System.out.print("시간대(아침/점심/저녁/상시): "); m.setMealTime(sc.nextLine());
         System.out.print("학기명: "); m.setSemesterName(sc.nextLine());
         m.setCurrentSemester(true);
         System.out.print("학생가: "); m.setPriceStu(getIntInput());
         System.out.print("교직원가: "); m.setPriceFac(getIntInput());
-        m.setDate(LocalDateTime.now()); // 날짜는 현재로 임시 설정
+        System.out.print("날짜 (YYYY-MM-DD): ");
+        String dateStr = sc.nextLine();
+        try {
+            // ISO_LOCAL_DATE 형식 (yyyy-MM-dd) 파싱
+            LocalDate date = LocalDate.parse(dateStr);
+            m.setDate(date.atStartOfDay());
+        } catch (Exception e) {
+            System.out.println("⚠️ 날짜 형식이 올바르지 않아 현재 날짜로 설정합니다. (입력값: " + dateStr + ")");
+            m.setDate(LocalDateTime.now());
+        }
 
         send(new Protocol(ProtocolType.REQUEST, ProtocolCode.MENU_INSERT_REQUEST, m));
         printSimpleResult(receive());
@@ -421,24 +582,6 @@ public class TestClient {
         if (len > 0) System.arraycopy(body, 0, packet, Protocol.HEADER_SIZE, len);
 
         return new Protocol(packet);
-    }
-
-    private static void printMainMenu() {
-        System.out.println("\n================ [통합 테스트 메뉴] ================");
-        System.out.println(" 1. 메뉴 목록 조회       10. [관리자] 메뉴 등록");
-        System.out.println(" 2. 메뉴 이미지 다운     11. [관리자] 메뉴 수정");
-        System.out.println(" 3. 쿠폰 목록 조회       12. [관리자] 메뉴 사진 등록");
-        System.out.println(" 4. 쿠폰 구매 요청       13. [관리자] 분식당 가격 등록");
-        System.out.println(" 5. 카드 결제 요청       14. [관리자] 일괄 가격 등록");
-        System.out.println(" 6. 쿠폰 결제 요청       15. [관리자] 쿠폰 정책 목록");
-        System.out.println(" 7. 이용 내역 조회       16. [관리자] 쿠폰 정책 생성");
-        System.out.println("                        17. [관리자] 결제 내역 조회");
-        System.out.println("                        18. [관리자] 매출 현황 조회");
-        System.out.println("                        19. [관리자] 이용 통계 조회");
-        System.out.println("                        20. [관리자] CSV 샘플 다운");
-        System.out.println("                        21. [관리자] CSV 업로드");
-        System.out.println(" 0. 종료");
-        System.out.print("선택>> ");
     }
 
     private static int getIntInput() {
