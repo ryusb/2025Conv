@@ -28,7 +28,6 @@ public class ClientHandler extends Thread {
     // 생성자: 클라이언트 소켓을 받아서 초기화합니다.
     public ClientHandler(Socket socket) {
         this.clientSocket = socket;
-        // DAO 객체 초기화
         this.userDAO = new UserDAO();
         this.menuDAO = new MenuPriceDAO();
         this.paymentDAO = new PaymentDAO();
@@ -78,16 +77,36 @@ public class ClientHandler extends Thread {
 
     // ⚠️ TODO: InputStream에서 바이트 배열을 읽어오는 메서드 구현 필요
     private byte[] readProtocolFromClient(InputStream is) throws IOException {
-        // 프로토콜의 전체 길이를 알 수 없으므로, 소켓 버퍼에서 데이터를 읽는 로직이 필요합니다.
-        // 일반적으로 4바이트 헤더(전체 길이)를 먼저 읽고, 그 길이만큼 나머지 바디를 읽습니다.
-        // 이 부분은 Protocol 구조에 맞게 구현되어야 합니다.
-        // 임시로, 단순하게 4096 바이트만 읽는 코드로 대체합니다. (실제로는 수정 필요)
-        byte[] buffer = new byte[4096];
-        int bytesRead = is.read(buffer);
-        if (bytesRead == -1) {
-            throw new IOException("클라이언트 연결이 종료되었습니다.");
+        // 1. 헤더 읽기 (Type 1 + Code 1 + Length 4 = 6 bytes)
+        byte[] header = new byte[6];
+        int totalRead = 0;
+        while (totalRead < 6) {
+            int read = is.read(header, totalRead, 6 - totalRead);
+            if (read == -1) throw new EOFException();
+            totalRead += read;
         }
-        return java.util.Arrays.copyOf(buffer, bytesRead);
+
+        // 2. 데이터 길이 파싱
+        int dataLength = ((header[2] & 0xff) << 24) |
+                ((header[3] & 0xff) << 16) |
+                ((header[4] & 0xff) << 8)  |
+                (header[5] & 0xff);
+
+        // 3. 데이터 바디 읽기
+        byte[] body = new byte[dataLength];
+        totalRead = 0;
+        while (totalRead < dataLength) {
+            int read = is.read(body, totalRead, dataLength - totalRead);
+            if (read == -1) throw new EOFException();
+            totalRead += read;
+        }
+
+        // 4. 합치기
+        byte[] packet = new byte[6 + dataLength];
+        System.arraycopy(header, 0, packet, 0, 6);
+        System.arraycopy(body, 0, packet, 6, dataLength);
+
+        return packet;
     }
 
     // ⚠️ TODO: 수신된 Protocol 객체를 분석하고 응답을 생성하는 메서드 구현 필요

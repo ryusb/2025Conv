@@ -72,44 +72,51 @@ public class Client {
 
                 // 2. 응답 수신 (간단한 읽기 로직)
                 // 실제로는 헤더를 먼저 읽고 길이를 파악해야 안전하지만, 테스트용으로 단순화함
-                byte[] buffer = new byte[1024 * 1024]; // 넉넉하게 1MB
-                int bytesRead = is.read(buffer);
+                byte[] header = new byte[6];
+                int totalRead = 0;
+                while (totalRead < 6) {
+                    int read = is.read(header, totalRead, 6 - totalRead);
+                    if (read == -1) break;
+                    totalRead += read;
+                }
 
-                if (bytesRead > 0) {
-                    byte[] responseData = java.util.Arrays.copyOf(buffer, bytesRead);
-                    Protocol response = new Protocol(responseData); // 역직렬화 수행
+                if (totalRead == 6) {
+                    int dataLength = ((header[2] & 0xff) << 24) |
+                            ((header[3] & 0xff) << 16) |
+                            ((header[4] & 0xff) << 8) |
+                            (header[5] & 0xff);
 
+                    byte[] body = new byte[dataLength];
+                    totalRead = 0;
+                    while (totalRead < dataLength) {
+                        int read = is.read(body, totalRead, dataLength - totalRead);
+                        if (read == -1) break;
+                        totalRead += read;
+                    }
+
+                    byte[] packet = new byte[6 + dataLength];
+                    System.arraycopy(header, 0, packet, 0, 6);
+                    System.arraycopy(body, 0, packet, 6, dataLength);
+
+                    Protocol response = new Protocol(packet);
                     System.out.println("⬅️ 응답 수신 완료. 코드: " + response.getCode());
 
-                    // 응답 데이터 처리
                     Object data = response.getData();
-
                     if (response.getCode() == ProtocolCode.LOGIN_RESPONSE) {
                         UserDTO user = (UserDTO) data;
-                        System.out.println("✅ 로그인 성공: " + user.getUserType() + " " + user.getLoginId());
-                    }
-                    else if (response.getCode() == ProtocolCode.USAGE_HISTORY_RESPONSE) {
-                        if (data instanceof List) {
-                            List<PaymentDTO> list = (List<PaymentDTO>) data;
-                            System.out.println("📄 이용 내역 (" + list.size() + "건):");
-                            for (PaymentDTO p : list) {
-                                System.out.println(" - [" + p.getPaymentTime() + "] " + p.getRestaurantName() + ": " + p.getMenuName());
-                            }
-                        }
-                    }
-                    else if (response.getCode() == ProtocolCode.ADMIN_SALES_QUERY_RESPONSE) {
-                        if (data instanceof Map) {
-                            Map<String, Long> sales = (Map<String, Long>) data;
-                            System.out.println("💰 식당별 매출 현황:");
-                            sales.forEach((name, amount) -> System.out.println(" - " + name + ": " + amount + "원"));
-                        }
-                    }
-                    else if (response.getCode() == ProtocolCode.FAIL) {
-                        System.out.println("❌ 요청 처리 실패");
+                        System.out.println("✅ 로그인 성공: " + user.getLoginId());
+                    } else if (response.getCode() == ProtocolCode.USAGE_HISTORY_RESPONSE) {
+                        List<PaymentDTO> list = (List<PaymentDTO>) data;
+                        System.out.println("📄 내역 수: " + list.size());
+                        for (PaymentDTO p : list) System.out.println(" - " + p.getMenuName());
+                    } else if (response.getCode() == ProtocolCode.ADMIN_SALES_QUERY_RESPONSE) {
+                        Map<String, Long> sales = (Map<String, Long>) data;
+                        System.out.println("💰 매출: " + sales);
+                    } else {
+                        System.out.println("❌ 실패 또는 알 수 없는 응답");
                     }
                 }
             }
-
         } catch (Exception e) {
             System.err.println("❌ 클라이언트 오류: " + e.getMessage());
             e.printStackTrace();
