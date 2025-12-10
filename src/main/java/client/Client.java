@@ -8,6 +8,7 @@ import network.*;
 import persistence.dto.UserDTO;
 import service.UserService;
 import service.UserSession;
+import service.AdminService;
 
 public class Client {
 
@@ -67,7 +68,13 @@ public class Client {
             // ===========================
             // ✔ 2) 로그인 성공 → 사용자 메뉴 진입
             // ===========================
-            UserService.mainService();
+            String userType = loggedInUser.getUserType();
+            if (userType != null && (userType.equalsIgnoreCase("admin") || "관리자".equals(userType))) {
+                System.out.println("관리자 계정으로 로그인되었습니다. 관리자 메뉴를 실행합니다.");
+                AdminService.mainService();
+            } else {
+                UserService.mainService();
+            }
 
             System.out.println("클라이언트 종료.");
 
