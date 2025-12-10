@@ -16,7 +16,7 @@ dependencies {
     implementation("mysql:mysql-connector-java:8.0.33")
     // Lombok 라이브러리 추가 (컴파일 시점에만 필요)
     compileOnly("org.projectlombok:lombok:1.18.30")
-
+    implementation("org.apache.commons:commons-dbcp2:2.9.0")
     // Lombok 코드가 실제 Java 코드를 생성하도록 처리 (필수)
     annotationProcessor("org.projectlombok:lombok:1.18.30")
 }

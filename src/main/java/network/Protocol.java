@@ -47,31 +47,20 @@ public class Protocol {
     }
 
     private DTO byteArrayToData(byte type, byte code, byte[] arr) throws Exception {
-        if (type == ProtocolType.REQUEST) {
+        // RESULT 타입은 데이터 없이 상태 코드만 내려온다고 가정한다.
+        if (type == ProtocolType.RESULT) {
+            return null;
+        }
+
+        // 요청/응답만 직렬화/역직렬화 대상
+        if (arr == null || arr.length == 0) {
+            return null;
+        }
+        if (type == ProtocolType.REQUEST || type == ProtocolType.RESPONSE) {
             return (DTO) Deserializer.getObject(arr);
         }
 
-        else if (type == ProtocolType.RESPONSE) {
-            return (DTO) Deserializer.getObject(arr);
-        }
-
-        else if (type == ProtocolType.RESULT) {
-            if (code == ProtocolCode.SUCCESS) {
-                return null;
-            }
-
-            else if (code == ProtocolCode.FAIL) {
-                return null;
-            }
-        }
-
-        try {
-            throw new Exception("타입과 코드가 맞지 않음");
-        } catch (Exception e) {
-            System.out.println(type + " " + code);
-            e.printStackTrace();
-        }
-
+        // 정의되지 않은 타입은 null 처리
         return null;
     }
 
