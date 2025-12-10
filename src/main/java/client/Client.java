@@ -9,6 +9,7 @@ import java.util.Scanner;
 import network.*;
 import persistence.dto.PaymentDTO;
 import persistence.dto.UserDTO;
+import service.MainService;
 
 public class Client {
     // ⚠️ TODO: 데스크톱의 실제 IP 주소를 여기에 입력하세요.
