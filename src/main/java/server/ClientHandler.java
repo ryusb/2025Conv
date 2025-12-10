@@ -22,8 +22,11 @@ public class ClientHandler extends Thread {
     private final MenuController menuController = new MenuController();
     private final CouponController couponController = new CouponController();
     private final PaymentController paymentController = new PaymentController();
+    private final PriceController priceController = new PriceController();
     private final UserDAO userDAO = new UserDAO();
     private final PaymentDAO paymentDAO = new PaymentDAO();
+
+    private UserDTO loginUser = null;
 
     public ClientHandler(Socket socket) {
         this.clientSocket = socket;
@@ -79,6 +82,15 @@ public class ClientHandler extends Thread {
     private Protocol handleRequest(Protocol req) {
         if (req.getType() != ProtocolType.REQUEST) {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
+        }
+
+        // [추가] 권한 체크 로직 (관리자 기능 접근 제어)
+        // ProtocolCode 0x10 ~ 0x29 범위는 관리자 전용이라고 가정
+        if (req.getCode() >= 0x10 && req.getCode() <= 0x29) {
+            if (this.loginUser == null || !"관리자".equals(this.loginUser.getUserType())) {
+                // 0x55: PERMISSION_DENIED 반환
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.PERMISSION_DENIED, "관리자 권한이 필요합니다.");
+            }
         }
 
         try {
@@ -155,9 +167,24 @@ public class ClientHandler extends Thread {
                 case ProtocolCode.MENU_PHOTO_REGISTER_REQUEST: // 0x12
                     return menuController.uploadMenuImage((MenuPriceDTO) req.getData());
 
+                case ProtocolCode.PRICE_REGISTER_SNACK_REQUEST: // 0x13 (분식당 단일 메뉴 가격)
+                {
+                    return priceController.upsertMenuPriceForSemester((MenuPriceDTO) req.getData());
+                }
+
+                case ProtocolCode.PRICE_REGISTER_REGULAR_REQUEST: // 0x14 (학식/교직원 일괄 가격)
+                {
+                    return priceController.bulkUpdatePricesForSemester((MenuPriceDTO) req.getData());
+                }
+
                 // ==========================================
                 // III. 관리자 - 정책/보고서/CSV
                 // ==========================================
+                case ProtocolCode.COUPON_POLICY_LIST_REQUEST: // 0x15
+                {
+                    return couponController.getCouponPolicies();
+                }
+
                 case ProtocolCode.COUPON_POLICY_INSERT_REQUEST: // 0x16
                     return couponController.upsertCouponPolicy((CouponPolicyDTO) req.getData());
 

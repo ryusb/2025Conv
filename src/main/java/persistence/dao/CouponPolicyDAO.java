@@ -33,6 +33,27 @@ public class CouponPolicyDAO {
         return Optional.empty(); // 정책이 없거나 오류 발생 시 빈 Optional 반환
     }
 
+    public java.util.List<CouponPolicyDTO> findAllPolicies() {
+        java.util.List<CouponPolicyDTO> list = new java.util.ArrayList<>();
+        String sql = "SELECT * FROM coupon_policy ORDER BY effective_date DESC";
+
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+
+            while (rs.next()) {
+                CouponPolicyDTO policy = new CouponPolicyDTO();
+                policy.setPolicyId(rs.getInt("policy_id"));
+                policy.setCouponPrice(rs.getInt("coupon_price"));
+                policy.setEffectiveDate(rs.getTimestamp("effective_date").toLocalDateTime());
+                list.add(policy);
+            }
+        } catch (SQLException e) {
+            System.err.println("CouponPolicyDAO - 정책 목록 조회 오류: " + e.getMessage());
+        }
+        return list;
+    }
+
     // 새로운 쿠폰 정책을 등록 
     public boolean insertPolicy(CouponPolicyDTO policy) {
         String sql = "INSERT INTO coupon_policy (coupon_price, effective_date) VALUES (?, ?)";
