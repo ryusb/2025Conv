@@ -92,6 +92,9 @@ public class Serializer {
         if (obj instanceof Double) {
             return doubleToByteArray((Double) obj);
         }
+        if (obj instanceof Boolean) {
+            return new byte[] { (byte)((Boolean)obj ? 1 : 0) };
+        }
         if (obj instanceof String) {
             return stringToByteArray((String) obj);
         }
@@ -124,6 +127,8 @@ public class Serializer {
                         arr = longToByteArray((long) memberVal);
                     } else if (typeStr.equals("double") || typeStr.contains("Double")) {
                         arr = doubleToByteArray((double) memberVal);
+                    } else if (typeStr.equals("boolean") || typeStr.contains("Boolean")) {
+                        arr = new byte[] { (byte)((Boolean)memberVal ? 1 : 0) };
                     } else if (typeStr.contains("String")) {
                         arr = stringToByteArray((String) memberVal);
                     } else if (typeStr.contains("LocalDateTime")) {

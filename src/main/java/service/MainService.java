@@ -1,5 +1,10 @@
 package service;
 
+import client.NetworkClient;
+import network.Protocol;
+import network.ProtocolCode;
+import persistence.dto.UserDTO;
+import util.InputHandler;
 import util.OutputHandler;
 
 public class MainService {
@@ -13,6 +18,33 @@ public class MainService {
     }
 
     private static String login() {
-        return "admin";
+        OutputHandler.showTitle("로그인");
+
+        String id = InputHandler.getString("아이디");
+        String pw = InputHandler.getString("비밀번호");
+
+        UserDTO dto = new UserDTO();
+        dto.setLoginId(id);
+        dto.setPassword(pw);
+
+        Protocol response = NetworkClient.sendRequest(
+                ProtocolCode.LOGIN_REQUEST,
+                dto
+        );
+
+        if (response == null) {
+            OutputHandler.showError("서버 응답 없음");
+            return null;
+        }
+
+        if (response.getCode() == ProtocolCode.LOGIN_RESPONSE) {
+            UserDTO user = (UserDTO) response.getData();
+            OutputHandler.showSuccess("로그인 성공: " + user.getLoginId());
+            return user.getUserType();   // "admin" / "student" / "other"
+        }
+
+        OutputHandler.showError("로그인 실패");
+        return null;
     }
+
 }
