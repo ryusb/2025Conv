@@ -82,6 +82,11 @@ public class Deserializer {
             System.arraycopy(objInfo, idx, arr, 0, DOUBLE_LENGTH);
             return byteArrayToDouble(arr);
         }
+        if (c == Boolean.class) {
+            byte[] arr = new byte[1];
+            System.arraycopy(objInfo, idx, arr, 0, 1);
+            return arr[0] != 0;
+        }
         if (c == String.class) {
             byte[] lenBytes = new byte[INT_LENGTH];
             System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
@@ -162,6 +167,10 @@ public class Deserializer {
                     byte[] arr = new byte[DOUBLE_LENGTH];
                     System.arraycopy(objInfo, idx, arr, 0, DOUBLE_LENGTH); idx += DOUBLE_LENGTH;
                     member[i].set(result, byteArrayToDouble(arr));
+                } else if (typeStr.equals("boolean") || typeStr.contains("Boolean")) {
+                    byte[] arr = new byte[1];
+                    System.arraycopy(objInfo, idx, arr, 0, 1); idx += 1;
+                    member[i].set(result, arr[0] != 0);
                 } else if (typeStr.contains("String")) {
                     byte[] lenBytes = new byte[INT_LENGTH];
                     System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
