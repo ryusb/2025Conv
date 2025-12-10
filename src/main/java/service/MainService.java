@@ -10,6 +10,9 @@ import util.OutputHandler;
 public class MainService {
     public static void run() {
         String role = login();
+
+        if (role == null) { return; }
+
         switch (role) {
             case "admin" -> AdminService.mainService();
             case "other", "student" -> UserService.mainService();
@@ -39,12 +42,11 @@ public class MainService {
 
         if (response.getCode() == ProtocolCode.LOGIN_RESPONSE) {
             UserDTO user = (UserDTO) response.getData();
-            OutputHandler.showSuccess("로그인 성공: " + user.getLoginId());
+            OutputHandler.showSuccess(user.getLoginId() + " 로그인");
             return user.getUserType();   // "admin" / "student" / "other"
         }
 
         OutputHandler.showError("로그인 실패");
         return null;
     }
-
 }

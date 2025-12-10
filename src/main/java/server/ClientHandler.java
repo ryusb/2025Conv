@@ -11,6 +11,7 @@ import java.util.Map;
 import network.Protocol;
 import network.ProtocolCode;
 import network.ProtocolType;
+import persistence.dao.MenuPriceDAO;
 import persistence.dao.PaymentDAO;
 import persistence.dao.UserDAO;
 import persistence.dto.*;
@@ -138,19 +139,13 @@ public class ClientHandler extends Thread {
 
                 case ProtocolCode.MENU_LIST_REQUEST: { // 0x03
                     Object data = req.getData();
-                    int restaurantId = 1;
-                    String menuDate = null;
-                    if (data instanceof java.util.Map<?, ?> map) {
-                        Object rid = map.get("restaurantId");
-                        if (rid instanceof Integer) {
-                            restaurantId = (Integer) rid;
-                        }
-                        Object md = map.get("menuDate");
-                        if (md instanceof String) {
-                            menuDate = (String) md;
-                        }
+                    if (data == null || !(data instanceof MenuPriceDTO)) {
+                        return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, null);
                     }
-                    List<MenuPriceDTO> menus = menuController.getMenusByRestaurantAndDate(restaurantId, menuDate);
+                    MenuPriceDTO inputDto = (MenuPriceDTO) data;
+                    int restId = inputDto.getRestaurantId();
+                    String time = inputDto.getMealTime();
+                    List<MenuPriceDTO> menus = menuController.getMenus(restId, time);
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_LIST_RESPONSE, menus);
                 }
 

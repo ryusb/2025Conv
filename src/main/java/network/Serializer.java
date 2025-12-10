@@ -4,9 +4,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Serializer {
     final static String UID_FIELD_NAME = "serialVersionUID";
@@ -82,6 +80,15 @@ public class Serializer {
             return byteListToArray(result);
         }
 
+        if (obj instanceof byte[]) {
+            byte[] arr = (byte[]) obj;
+            // 배열 길이(4바이트) + 본문(N바이트) 구조로 리턴
+            ArrayList<Byte> result = new ArrayList<>();
+            addArrList(result, intToByteArray(arr.length));
+            addArrList(result, arr);
+            return byteListToArray(result);
+        }
+
         // 기본 타입 처리
         if (obj instanceof Integer) {
             return intToByteArray((Integer) obj);
@@ -107,6 +114,7 @@ public class Serializer {
 
         Class<?> c = obj.getClass();
         Field[] member = c.getDeclaredFields();
+        Arrays.sort(member, Comparator.comparing(Field::getName));
         ArrayList<Byte> result = new ArrayList<>();
         byte[] arr = new byte[0];
 
@@ -129,6 +137,13 @@ public class Serializer {
                         arr = doubleToByteArray((double) memberVal);
                     } else if (typeStr.equals("boolean") || typeStr.contains("Boolean")) {
                         arr = new byte[] { (byte)((Boolean)memberVal ? 1 : 0) };
+                    } else if (typeStr.contains("[B")) { // [B는 byte[]의 자바 내부 이름입니다.
+                        byte[] val = (byte[]) memberVal;
+                        // 길이 + 데이터
+                        ArrayList<Byte> temp = new ArrayList<>();
+                        addArrList(temp, intToByteArray(val.length));
+                        addArrList(temp, val);
+                        arr = byteListToArray(temp);
                     } else if (typeStr.contains("String")) {
                         arr = stringToByteArray((String) memberVal);
                     } else if (typeStr.contains("LocalDateTime")) {
