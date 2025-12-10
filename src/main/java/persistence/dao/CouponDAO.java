@@ -71,4 +71,66 @@ public class CouponDAO {
             return false;
         }
     }
+
+    public persistence.dto.CouponDTO findById(int couponId) {
+        String sql = "SELECT * FROM coupon WHERE coupon_id = ?";
+        persistence.dto.CouponDTO coupon = null;
+
+        try (java.sql.Connection conn = network.DBConnectionManager.getConnection();
+             java.sql.PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, couponId);
+
+            try (java.sql.ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    coupon = new persistence.dto.CouponDTO();
+                    coupon.setCouponId(rs.getInt("coupon_id"));
+                    coupon.setUserId(rs.getInt("user_id"));
+
+                    // Timestamp -> LocalDateTime 변환
+                    java.sql.Timestamp ts = rs.getTimestamp("purchase_date");
+                    if (ts != null) coupon.setPurchaseDate(ts.toLocalDateTime());
+
+                    coupon.setPurchaseValue(rs.getInt("purchase_value")); // 구매 당시 가치
+                    coupon.setUsed(rs.getBoolean("is_used"));
+                }
+            }
+        } catch (java.sql.SQLException e) {
+            System.err.println("CouponDAO - 쿠폰 조회 중 DB 오류: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return coupon;
+    }
+
+    public List<CouponDTO> findUnusedCouponsByUserId(int userId) {
+        List<CouponDTO> list = new ArrayList<>();
+        // 사용하지 않은(is_used = FALSE) 쿠폰만 조회, 오래된 순(FIFO) 정렬
+        String sql = "SELECT * FROM coupon WHERE user_id = ? AND is_used = FALSE ORDER BY purchase_date ASC";
+
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, userId);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapResultSetToCoupon(rs));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("CouponDAO - 잔여 쿠폰 조회 오류: " + e.getMessage());
+        }
+        return list;
+    }
+
+    // ResultSet 매핑 헬퍼
+    private CouponDTO mapResultSetToCoupon(ResultSet rs) throws SQLException {
+        CouponDTO coupon = new CouponDTO();
+        coupon.setCouponId(rs.getInt("coupon_id"));
+        coupon.setUserId(rs.getInt("user_id"));
+        coupon.setPurchaseDate(rs.getTimestamp("purchase_date").toLocalDateTime());
+        coupon.setPurchaseValue(rs.getInt("purchase_value")); // 구매 당시 가격 확인 가능
+        coupon.setUsed(rs.getBoolean("is_used"));
+        return coupon;
+    }
 }

@@ -3,16 +3,39 @@ import lombok.Getter;
 import lombok.Setter;
 import persistence.dto.DTO;
 
+import java.io.ByteArrayInputStream;
+import java.io.EOFException;
+import java.io.ObjectInputStream;
+
 @Getter
 @Setter
 public class Protocol {
-    // 💡 1 Type + 1 Code + 4 DataLength (int) = 6 bytes
     public static final int HEADER_SIZE = 6;
 
     private byte type;
     private byte code;
     private int dataLength;
     private Object data;
+
+    public Protocol(byte type, byte code, Object data) {
+        this.type = type;
+        this.code = code;
+        this.data = data;
+
+        // 데이터가 있으면 미리 직렬화하여 길이를 계산해 둡니다.
+        if (data != null) {
+            try {
+                // Serializer를 이용해 실제 바이트 길이를 구함
+                byte[] bytes = Serializer.getBytes(data);
+                this.dataLength = bytes.length;
+            } catch (Exception e) {
+                e.printStackTrace();
+                this.dataLength = 0;
+            }
+        } else {
+            this.dataLength = 0;
+        }
+    }
 
     public Protocol(byte t, byte c, int dL, Object d) {
         type = t;
@@ -50,44 +73,43 @@ public class Protocol {
         return resultArray;
     }
 
-    private DTO byteArrayToData(byte type, byte code, byte[] arr) throws Exception {
-        // RESULT 타입은 데이터 없이 상태 코드만 내려온다고 가정한다.
-        if (type == ProtocolType.RESULT) {
-            return null;
-        }
-
-        // 요청/응답만 직렬화/역직렬화 대상
-        if (arr == null || arr.length == 0) {
-            return null;
-        }
+    private Object byteArrayToData(byte type, byte code, byte[] arr) throws Exception {
         if (type == ProtocolType.REQUEST || type == ProtocolType.RESPONSE) {
-            return (DTO) Deserializer.getObject(arr);
+            return Deserializer.getObject(arr);
         }
-
-        // 정의되지 않은 타입은 null 처리
+        else if (type == ProtocolType.RESULT) {
+            // 결과 코드 범위 체크 (성공~서버에러)
+            if (code >= ProtocolCode.SUCCESS && code <= ProtocolCode.SERVER_ERROR) {
+                return null;
+            }
+        }
+        try {
+            String hexCode = Integer.toHexString(code & 0xFF).toUpperCase();
+            throw new Exception("타입과 코드가 맞지 않음. Type: " + type + ", Code: 0x" + hexCode);
+        } catch (Exception e) {
+            System.out.println("Error Type: " + type + ", Code: 0x" + Integer.toHexString(code & 0xFF).toUpperCase());
+            e.printStackTrace();
+        }
         return null;
     }
 
-    public void byteArrayToProtocol(byte[] arr) {
-        final int INT_LENGTH = 4;
-        type = arr[0];
-        code = arr[1];
+    public void byteArrayToProtocol(byte[] bytes) {
+        this.type = bytes[0];
+        this.code = bytes[1];
+        this.dataLength = java.nio.ByteBuffer.wrap(bytes, 2, 4).getInt();
 
-        int pos = 0;
-        pos += 2; // Type, Code 스킵
+        if (dataLength > 0) {
+            byte[] payload = new byte[dataLength];
+            System.arraycopy(bytes, HEADER_SIZE, payload, 0, dataLength);
 
-        byte[] dataLengthByteArray = new byte[4];
-        System.arraycopy(arr, pos, dataLengthByteArray, 0, INT_LENGTH); pos += 4;
-        dataLength = Deserializer.byteArrayToInt(dataLengthByteArray);
-
-        byte[] dataArray = new byte[dataLength];
-        // dataLength는 arr[2]부터 arr[5]에 있으므로, data는 arr[6]부터 시작합니다.
-        System.arraycopy(arr, HEADER_SIZE, dataArray, 0, dataLength); pos += dataLength;
-        try {
-            data = byteArrayToData(type, code, dataArray);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
+            try {
+                this.data = byteArrayToData(type, code, payload);
+            } catch (Exception e) {
+                System.out.println("데이터 역직렬화 실패: " + e.getMessage());
+                e.printStackTrace();
+            }
+        } else {
+            this.data = null;
         }
     }
 }

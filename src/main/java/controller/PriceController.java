@@ -21,13 +21,13 @@ public class PriceController {
      */
     public Protocol upsertMenuPriceForSemester(MenuPriceDTO menu) {
         if (!isValidSingle(menu)) {
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
         }
 
         boolean success;
         if (menu.getMenuPriceId() > 0) {
             if (!menuPriceDAO.existsById(menu.getMenuPriceId())) {
-                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
             }
             success = menuPriceDAO.updateMenuPriceAndSemester(menu);
         } else {
@@ -35,8 +35,8 @@ public class PriceController {
         }
 
         return success
-                ? new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, 0, null)
-                : new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+                ? new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, null)
+                : new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
     }
 
     /**
@@ -44,7 +44,7 @@ public class PriceController {
      */
     public Protocol bulkUpdatePricesForSemester(MenuPriceDTO menu) {
         if (!isValidBulk(menu)) {
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
         }
 
         boolean success = menuPriceDAO.bulkUpdateSemesterPrices(
@@ -56,8 +56,8 @@ public class PriceController {
         );
 
         return success
-                ? new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, 0, null)
-                : new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+                ? new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, null)
+                : new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
     }
 
     private boolean isValidSingle(MenuPriceDTO menu) {

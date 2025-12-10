@@ -11,7 +11,7 @@ import java.util.Map;
 
 public class Deserializer {
     final static String UID_FIELD_NAME = "serialVersionUID";
-    final static long DEFAULT_UID = 0l;
+    final static long DEFAULT_UID = 0L;
     final static int INT_LENGTH = 4;
     final static int LONG_LENGTH = 8;
     final static int DOUBLE_LENGTH = 8;
@@ -35,35 +35,35 @@ public class Deserializer {
 
         Class<?> c = Class.forName(name);
         idx = checkVersion(c, objInfo, idx);
-        Object result = null;
 
-        result = makeObject(c, objInfo, idx);
-
-        return result;
+        return makeObject(c, objInfo, idx);
     }
 
-
     public static int checkVersion(Class<?> c, byte[] objInfo, int idx) throws Exception {
-        long destUID = DEFAULT_UID;
+        if (c.getName().startsWith("java.")) {
+            return idx + LONG_LENGTH;
+        }
 
+        long destUID = DEFAULT_UID;
         try {
             Field uidField = c.getDeclaredField(UID_FIELD_NAME);
             uidField.setAccessible(true);
-            destUID = (long) uidField.get(c);
+            destUID = (long) uidField.get(null); // static 필드는 인스턴스 대신 null 사용
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            // 필드가 없거나 접근 불가하면 기본값 유지
         }
-        catch (NoSuchFieldException e) {  }
 
         byte[] longByteArray = new byte[LONG_LENGTH];
-        System.arraycopy(objInfo, idx, longByteArray, 0, LONG_LENGTH); idx += LONG_LENGTH;
+        System.arraycopy(objInfo, idx, longByteArray, 0, LONG_LENGTH);
+        idx += LONG_LENGTH;
         long srcUID = byteArrayToLong(longByteArray);
 
         if (destUID != srcUID) {
-            throw new Exception("not match version");
+            throw new Exception("버전(serialVersionUID)이 일치하지 않습니다. 클래스: " + c.getName());
         }
 
         return idx;
     }
-
 
     public static Object makeObject(Class<?> c, byte[] objInfo, int idx) throws Exception {
         // 기본 타입 처리
@@ -211,31 +211,5 @@ public class Deserializer {
         return (double)( (0xff & arr[0]) << 8*7 | (0xff & arr[1]) << 8*6 | (0xff & arr[2]) << 8*5 |
                 (0xff & arr[3]) << 8*4 | (0xff & arr[4]) << 8*3 | (0xff & arr[5]) << 8*2 |
                 (0xff & arr[6]) << 8 | (0xff & arr[7]));
-    }
-
- //llm 수정 권장 내용 인지
-    public static LocalDateTime byteArrayToDate(byte[] arr) {
-        final int LENGTH = 4;
-
-        byte[] yearByteArray = new byte[LENGTH];
-        byte[] monthByteArray = new byte[LENGTH];
-        byte[] dayByteArray = new byte[LENGTH];
-        byte[] hourByteArray = new byte[LENGTH];
-        byte[] minuteByteArray = new byte[LENGTH];
-
-        int pos = 0;
-        System.arraycopy(yearByteArray, 0, arr, pos, LENGTH); pos += LENGTH;
-        System.arraycopy(monthByteArray, 0, arr, pos, LENGTH); pos += LENGTH;
-        System.arraycopy(dayByteArray, 0, arr, pos, LENGTH); pos += LENGTH;
-        System.arraycopy(hourByteArray, 0, arr, pos, LENGTH); pos += LENGTH;
-        System.arraycopy(minuteByteArray, 0, arr, pos, LENGTH); pos += LENGTH;
-
-        int year = byteArrayToInt(yearByteArray);
-        int month = byteArrayToInt(monthByteArray);
-        int day = byteArrayToInt(dayByteArray);
-        int hour = byteArrayToInt(hourByteArray);
-        int minute = byteArrayToInt(minuteByteArray);
-
-        return LocalDateTime.of(year, month, day, hour, minute);
     }
 }
