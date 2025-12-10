@@ -6,6 +6,9 @@ import persistence.dto.DTO;
 @Getter
 @Setter
 public class Protocol {
+    // 💡 1 Type + 1 Code + 4 DataLength (int) = 6 bytes
+    public static final int HEADER_SIZE = 6;
+
     private byte type;
     private byte code;
     private int dataLength;
@@ -26,6 +29,7 @@ public class Protocol {
         byte[] dataByteArray = new byte[0];
         if (data != null) {
             try {
+                // Serializer는 외부 구현에 의존
                 dataByteArray = Serializer.getBytes(data);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -47,20 +51,12 @@ public class Protocol {
     }
 
     private DTO byteArrayToData(byte type, byte code, byte[] arr) throws Exception {
-        if (type == ProtocolType.REQUEST) {
+        if (type == ProtocolType.REQUEST || type == ProtocolType.RESPONSE) {
             return (DTO) Deserializer.getObject(arr);
         }
-
-        else if (type == ProtocolType.RESPONSE) {
-            return (DTO) Deserializer.getObject(arr);
-        }
-
         else if (type == ProtocolType.RESULT) {
-            if (code == ProtocolCode.SUCCESS) {
-                return null;
-            }
-
-            else if (code == ProtocolCode.FAIL) {
+            // RESULT 타입은 DTO가 없을 수 있음
+            if (code == ProtocolCode.SUCCESS || code == ProtocolCode.FAIL) {
                 return null;
             }
         }
@@ -81,13 +77,15 @@ public class Protocol {
         code = arr[1];
 
         int pos = 0;
-        pos += 2;
+        pos += 2; // Type, Code 스킵
+
         byte[] dataLengthByteArray = new byte[4];
         System.arraycopy(arr, pos, dataLengthByteArray, 0, INT_LENGTH); pos += 4;
         dataLength = Deserializer.byteArrayToInt(dataLengthByteArray);
 
         byte[] dataArray = new byte[dataLength];
-        System.arraycopy(arr, 2 + INT_LENGTH, dataArray, 0, dataLength); pos += dataLength;
+        // dataLength는 arr[2]부터 arr[5]에 있으므로, data는 arr[6]부터 시작합니다.
+        System.arraycopy(arr, HEADER_SIZE, dataArray, 0, dataLength); pos += dataLength;
         try {
             data = byteArrayToData(type, code, dataArray);
         }
