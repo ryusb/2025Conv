@@ -13,10 +13,7 @@ import network.ProtocolCode;
 import network.ProtocolType;
 import persistence.dao.PaymentDAO;
 import persistence.dao.UserDAO;
-import persistence.dto.CouponPolicyDTO;
-import persistence.dto.MenuPriceDTO;
-import persistence.dto.PaymentDTO;
-import persistence.dto.UserDTO;
+import persistence.dto.*;
 
 public class ClientHandler extends Thread {
     private final Socket clientSocket;
@@ -116,7 +113,25 @@ public class ClientHandler extends Thread {
                         return new Protocol(ProtocolType.RESULT, ProtocolCode.NOT_FOUND, null);
                     }
                 }
+                case ProtocolCode.COUPON_LIST_REQUEST: { // 0x05 (쿠폰 조회)
+                    int userId = (int) req.getData();
+                    // [연결] 잔여 쿠폰 목록 조회
+                    List<CouponDTO> coupons = couponController.getMyCoupons(userId);
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.COUPON_LIST_RESPONSE, coupons);
+                }
 
+                case ProtocolCode.COUPON_PURCHASE_REQUEST: { // 0x06 (쿠폰 구매)
+                    // 클라이언트가 Map이나 DTO로 {userId, quantity}를 보낸다고 가정
+                    // 여기서는 편의상 DTO나 Map 처리 예시를 듭니다.
+                    // 만약 DTO를 안 쓴다면 Map<String, Integer> 등을 활용하세요.
+                    @SuppressWarnings("unchecked")
+                    java.util.Map<String, Integer> reqData = (java.util.Map<String, Integer>) req.getData();
+                    int userId = reqData.get("userId");
+                    int quantity = reqData.get("quantity");
+
+                    // [연결] 구매 로직 수행
+                    return couponController.purchaseCoupons(userId, quantity);
+                }
                 case ProtocolCode.PAYMENT_CARD_REQUEST:   // 0x07
                 case ProtocolCode.PAYMENT_COUPON_REQUEST: // 0x08
                 {

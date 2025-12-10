@@ -2,7 +2,6 @@ package network;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,7 +10,7 @@ import java.util.Map;
 
 public class Deserializer {
     final static String UID_FIELD_NAME = "serialVersionUID";
-    final static long DEFAULT_UID = 0l;
+    final static long DEFAULT_UID = 0L;
     final static int INT_LENGTH = 4;
     final static int LONG_LENGTH = 8;
     final static int DOUBLE_LENGTH = 8;
