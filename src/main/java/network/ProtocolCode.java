@@ -11,6 +11,7 @@ public class ProtocolCode {
     public static final byte LOGIN_REQUEST = 0x10;          // 로그인 요청
     public static final byte LOGOUT_REQUEST = 0x1F;         // 로그아웃 요청
 
+
     // 사용자(학생/교직원) 기능
     public static final byte MENU_QUERY_REQUEST = 0x20;       // 메뉴 조회(텍스트) 요청
     public static final byte IMAGE_DOWNLOAD_REQUEST = 0x21;   // 메뉴 이미지 다운로드 요청
