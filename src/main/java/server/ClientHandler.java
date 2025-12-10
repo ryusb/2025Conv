@@ -138,9 +138,14 @@ public class ClientHandler extends Thread {
                 }
 
                 case ProtocolCode.MENU_LIST_REQUEST: { // 0x03
-                    // 예: 1번 식당, 점심 메뉴 조회 (클라이언트 데이터에 따라 동적 처리 가능)
-                    MenuPriceDTO menuPriceDTO = (MenuPriceDTO) req.getData();
-                    List<MenuPriceDTO> menus = menuController.getMenus(menuPriceDTO.getRestaurantId(), menuPriceDTO.getMealTime());
+                    Object data = req.getData();
+                    if (data == null || !(data instanceof MenuPriceDTO)) {
+                        return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, null);
+                    }
+                    MenuPriceDTO inputDto = (MenuPriceDTO) data;
+                    int restId = inputDto.getRestaurantId();
+                    String time = inputDto.getMealTime();
+                    List<MenuPriceDTO> menus = menuController.getMenus(restId, time);
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_LIST_RESPONSE, menus);
                 }
 
