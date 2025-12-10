@@ -33,7 +33,8 @@ public class ProtocolCode {
     public static final byte USAGE_REPORT_REQUEST = 0x19;          // 이용 현황 조회 요청
     public static final byte CSV_SAMPLE_DOWNLOAD_REQUEST = 0x20;   // CSV 샘플 파일 다운로드 요청
     public static final byte CSV_MENU_UPLOAD_REQUEST = 0x21;       // CSV 파일 업로드 (메뉴 등록) 요청
-
+    public static final byte ADMIN_CSV_SAMPLE_REQUEST = 0x22;     // CSV 샘플 다운로드 요청
+    public static final byte ADMIN_CSV_UPLOAD_REQUEST = 0x23;     // CSV 메뉴 일괄 등록 요청
 
     // -----------------------------------------------------------
     // Type: RESPONSE (서버 -> 클라이언트) - 0x30번대 사용
@@ -49,8 +50,8 @@ public class ProtocolCode {
     public static final byte ORDER_PAYMENT_HISTORY_RESPONSE = 0x37; // 주문/결제 내역 응답
     public static final byte SALES_REPORT_RESPONSE = 0x38;       // 매출 현황 보고서 응답
     public static final byte USAGE_REPORT_RESPONSE = 0x39;       // 이용 현황 보고서 응답
-    public static final byte CSV_FILE_RESPONSE = 0x3A;           // CSV 파일 데이터 응답
-
+    public static final byte TIME_STATS_RESPONSE = 0x3A;         // 시간대별 통계(List<String>) 반환
+    public static final byte CSV_FILE_RESPONSE = 0x3B;           // CSV 파일 반환
 
     // -----------------------------------------------------------
     // Type: RESULT (범용 성공/실패/오류) - 0x50번대 사용

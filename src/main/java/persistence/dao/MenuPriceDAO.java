@@ -42,8 +42,9 @@ public class MenuPriceDAO {
     }
     // 메뉴 신규 등록
     public boolean insertMenu(MenuPriceDTO menu) {
-        String sql = "INSERT INTO menu_price (restaurant_id, restaurant_name, semester_name, is_current_semester, meal_time, menu_name, price_stu, price_fac) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        // [수정] date 컬럼 추가
+        String sql = "INSERT INTO menu_price (restaurant_id, restaurant_name, semester_name, is_current_semester, meal_time, menu_name, price_stu, price_fac, date) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DBConnectionManager.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -57,10 +58,14 @@ public class MenuPriceDAO {
             pstmt.setInt(7, menu.getPriceStu());
             pstmt.setInt(8, menu.getPriceFac());
 
-            int affectedRows = pstmt.executeUpdate();
-            if (affectedRows == 0) {
-                return false;
+            if (menu.getDate() != null) {
+                pstmt.setTimestamp(9, Timestamp.valueOf(menu.getDate()));
+            } else {
+                pstmt.setNull(9, Types.TIMESTAMP);
             }
+
+            int affectedRows = pstmt.executeUpdate();
+            if (affectedRows == 0) return false;
 
             try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
                 if (generatedKeys.next()) {
@@ -69,7 +74,7 @@ public class MenuPriceDAO {
             }
             return true;
         } catch (SQLException e) {
-            System.err.println("RestaurantDAO - 메뉴 등록 중 DB 오류: " + e.getMessage());
+            System.err.println("MenuPriceDAO - 메뉴 등록 중 DB 오류: " + e.getMessage());
             return false;
         }
     }

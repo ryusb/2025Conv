@@ -8,144 +8,180 @@ import java.net.Socket;
 import java.util.List;
 import java.util.Map;
 
-import network.Protocol; // Protocol 객체를 사용하여 통신 처리
+import network.Protocol;
 import network.ProtocolCode;
 import network.ProtocolType;
 import persistence.dao.PaymentDAO;
 import persistence.dao.UserDAO;
+import persistence.dto.CouponPolicyDTO;
 import persistence.dto.MenuPriceDTO;
 import persistence.dto.PaymentDTO;
 import persistence.dto.UserDTO;
 
 public class ClientHandler extends Thread {
     private final Socket clientSocket;
+
+    // 컨트롤러 및 DAO 초기화
     private final MenuController menuController = new MenuController();
     private final CouponController couponController = new CouponController();
     private final PaymentController paymentController = new PaymentController();
     private final UserDAO userDAO = new UserDAO();
+    private final PaymentDAO paymentDAO = new PaymentDAO();
 
-    // 생성자: 클라이언트 소켓을 받아서 초기화합니다.
     public ClientHandler(Socket socket) {
         this.clientSocket = socket;
     }
 
     @Override
     public void run() {
-        try (
-                InputStream inputStream = clientSocket.getInputStream();
-                OutputStream outputStream = clientSocket.getOutputStream();
-        ) {
+        try (InputStream is = clientSocket.getInputStream();
+             OutputStream os = clientSocket.getOutputStream()) {
+
+            // 연결이 유지되는 동안 계속 요청을 처리 (Persistent Connection)
             while (true) {
-                // 1. 요청 수신
-                byte[] receivedData;
+                byte[] data;
                 try {
-                    receivedData = readProtocolFromClient(inputStream);
+                    data = readProtocol(is);
                 } catch (IOException e) {
-                    // 클라이언트 연결 종료 시 루프 탈출
                     System.out.println("클라이언트 연결 종료: " + clientSocket.getInetAddress());
                     break;
                 }
 
-                if (receivedData == null) {
-                    break;
-                }
+                if (data == null) break;
 
-                Protocol receivedProtocol = new Protocol(receivedData);
-                System.out.println("수신된 요청 - 코드: 0x" + Integer.toHexString(receivedProtocol.getCode() & 0xFF).toUpperCase());
+                Protocol request = new Protocol(data);
+                System.out.println("요청 수신: 0x" + Integer.toHexString(request.getCode() & 0xFF).toUpperCase());
 
-                // 2. 요청 처리
-                Protocol response = handleRequest(receivedProtocol);
+                // 요청 처리 및 응답 생성
+                Protocol response = handleRequest(request);
 
-                // 3. 응답 전송
-                outputStream.write(response.getBytes());
-                outputStream.flush();
+                // 응답 전송
+                os.write(response.getBytes());
+                os.flush();
             }
         } catch (Exception e) {
-            System.err.println("클라이언트 처리 중 오류 발생: " + e.getMessage());
+            System.err.println("클라이언트 핸들러 오류: " + e.getMessage());
+            e.printStackTrace();
         } finally {
             try {
-                if (clientSocket != null) clientSocket.close();
-            } catch (IOException e) { e.printStackTrace(); }
+                if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
+            } catch (IOException e) {}
         }
     }
 
-    // ⚠️ TODO: InputStream에서 바이트 배열을 읽어오는 메서드 구현 필요
-    private byte[] readProtocolFromClient(InputStream is) throws IOException {
-        // 프로토콜의 전체 길이를 알 수 없으므로, 소켓 버퍼에서 데이터를 읽는 로직이 필요합니다.
-        // 일반적으로 4바이트 헤더(전체 길이)를 먼저 읽고, 그 길이만큼 나머지 바디를 읽습니다.
-        // 이 부분은 Protocol 구조에 맞게 구현되어야 합니다.
-        // 임시로, 단순하게 4096 바이트만 읽는 코드로 대체합니다. (실제로는 수정 필요)
-        byte[] buffer = new byte[4096 * 10];
-        int bytesRead = is.read(buffer);
-        if (bytesRead == -1) {
-            throw new IOException("클라이언트 연결이 종료되었습니다.");
-        }
-        return java.util.Arrays.copyOf(buffer, bytesRead);
+    // 데이터 수신 헬퍼 메서드
+    private byte[] readProtocol(InputStream is) throws IOException {
+        // 충분한 버퍼 크기 할당 (이미지 업로드 등 대비)
+        byte[] buffer = new byte[1024 * 1024 * 2];
+        int read = is.read(buffer);
+        if (read == -1) throw new IOException("EOF");
+        return java.util.Arrays.copyOf(buffer, read);
     }
 
-    // 수신된 Protocol 객체를 분석하고 응답을 생성하는 메서드 구현
-    private Protocol handleRequest(Protocol receivedProtocol) {
-        if (receivedProtocol.getType() != ProtocolType.REQUEST) {
+    // 핵심 로직: 프로토콜 코드에 따른 분기 처리
+    private Protocol handleRequest(Protocol req) {
+        if (req.getType() != ProtocolType.REQUEST) {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
         }
 
-        byte code = receivedProtocol.getCode();
-
         try {
-            switch (code) {
-                // --- 1. 사용자 인증 ---
-                case ProtocolCode.LOGIN_REQUEST: {
-                    UserDTO u = (UserDTO) receivedProtocol.getData();
-                    UserDTO resultUser = userDAO.findUserByLoginId(u.getLoginId(), u.getPassword());
-                    if (resultUser != null) {
-                        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, 0, resultUser);                    } else {
+            switch (req.getCode()) {
+                // ==========================================
+                // I. 사용자 인증 및 결제
+                // ==========================================
+                case ProtocolCode.LOGIN_REQUEST: { // 0x02
+                    UserDTO u = (UserDTO) req.getData();
+                    UserDTO result = userDAO.findUserByLoginId(u.getLoginId(), u.getPassword());
+                    if (result != null) {
+                        // 성공 시 LOGIN_RESPONSE (0x30) + 유저 데이터 반환
+                        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, 0, result);
+                    } else {
+                        // 실패 시 INVALID_INPUT (0x52) 반환
+                        return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, 0, null);
                     }
-                    return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, 0, null); // 또는 INVALID_INPUT
                 }
 
-                // --- 2. 메뉴 관련 ---
-                case ProtocolCode.MENU_LIST_REQUEST: // 또는 MENU_LIST_REQUEST
-                {
-                    // 예시: 1번 식당, 점심 메뉴 조회
+                case ProtocolCode.MENU_LIST_REQUEST: { // 0x03
+                    // 예: 1번 식당, 점심 메뉴 조회 (클라이언트 데이터에 따라 동적 처리 가능)
                     List<MenuPriceDTO> menus = menuController.getMenus(1, "점심");
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_LIST_RESPONSE, 0, menus);
                 }
 
-                // --- 3. 결제 관련 ---
-                case ProtocolCode.PAYMENT_CARD_REQUEST: // 카드 결제 요청 코드 사용 시
-                {
-                    PaymentDTO paymentReq = (PaymentDTO) receivedProtocol.getData();
-                    return paymentController.processPayment(paymentReq);
+                case ProtocolCode.MENU_IMAGE_DOWNLOAD_REQUEST: { // 0x04
+                    int menuId = (int) req.getData();
+                    byte[] img = menuController.getMenuImage(menuId);
+                    if (img != null) {
+                        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_IMAGE_RESPONSE, 0, img);
+                    } else {
+                        return new Protocol(ProtocolType.RESULT, ProtocolCode.NOT_FOUND, 0, null);
+                    }
                 }
 
-                case ProtocolCode.USAGE_HISTORY_REQUEST: {
-                    int userId = (int) receivedProtocol.getData();
-                    PaymentDAO paymentDAO = new PaymentDAO();
+                case ProtocolCode.PAYMENT_CARD_REQUEST:   // 0x07
+                case ProtocolCode.PAYMENT_COUPON_REQUEST: // 0x08
+                {
+                    // PaymentController에서 카드/쿠폰 구분 로직 처리
+                    return paymentController.processPayment((PaymentDTO) req.getData());
+                }
+
+                case ProtocolCode.USAGE_HISTORY_REQUEST: { // 0x09
+                    int userId = (int) req.getData();
                     List<PaymentDTO> history = paymentDAO.findHistoryByUserId(userId);
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.USAGE_HISTORY_RESPONSE, 0, history);
                 }
 
-                // --- 4. 관리자 기능 ---
-                case ProtocolCode.MENU_INSERT_REQUEST: {
-                    return menuController.registerOrUpdateMenu((MenuPriceDTO) receivedProtocol.getData());
+                // ==========================================
+                // II. 관리자 - 메뉴/가격 관리
+                // ==========================================
+                case ProtocolCode.MENU_INSERT_REQUEST:       // 0x10
+                case ProtocolCode.MENU_UPDATE_REQUEST:       // 0x11
+                    return menuController.registerOrUpdateMenu((MenuPriceDTO) req.getData());
+
+                case ProtocolCode.MENU_PHOTO_REGISTER_REQUEST: // 0x12
+                    return menuController.uploadMenuImage((MenuPriceDTO) req.getData());
+
+                // ==========================================
+                // III. 관리자 - 정책/보고서/CSV
+                // ==========================================
+                case ProtocolCode.COUPON_POLICY_INSERT_REQUEST: // 0x16
+                    return couponController.upsertCouponPolicy((CouponPolicyDTO) req.getData());
+
+                case ProtocolCode.ORDER_PAYMENT_HISTORY_REQUEST: { // 0x17
+                    // 식당별 결제 내역 (클라이언트에서 식당ID 전송 가정)
+                    int restaurantId = (int) req.getData();
+                    List<PaymentDTO> list = paymentDAO.findHistoryByRestaurantId(restaurantId);
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.ORDER_PAYMENT_HISTORY_RESPONSE, 0, list);
                 }
 
-                case ProtocolCode.MENU_PHOTO_REGISTER_REQUEST: {
-                    return menuController.uploadMenuImage((MenuPriceDTO) receivedProtocol.getData());
+                case ProtocolCode.SALES_REPORT_REQUEST: { // 0x18
+                    Map<String, Long> sales = paymentDAO.getSalesStatsByRestaurant();
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.SALES_REPORT_RESPONSE, 0, sales);
                 }
 
-                case ProtocolCode.COUPON_POLICY_INSERT_REQUEST: {
-                    return couponController.upsertCouponPolicy((persistence.dto.CouponPolicyDTO) receivedProtocol.getData());
+                case ProtocolCode.USAGE_REPORT_REQUEST: { // 0x19
+                    List<String> stats = paymentDAO.getTimeSlotUsageStats();
+                    // ProtocolCode에 정의된 TIME_STATS_RESPONSE (0x3A) 사용
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.TIME_STATS_RESPONSE, 0, stats);
                 }
 
-                case ProtocolCode.SALES_REPORT_REQUEST: {
-                    PaymentDAO dao = new PaymentDAO();
-                    Map<String, Long> stats = dao.getSalesStatsByRestaurant();
-                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.SALES_REPORT_RESPONSE, 0, stats);
+                // CSV 샘플 다운로드 (중복 코드 모두 처리)
+                case ProtocolCode.CSV_SAMPLE_DOWNLOAD_REQUEST: // 0x20
+                case ProtocolCode.ADMIN_CSV_SAMPLE_REQUEST:    // 0x22
+                {
+                    byte[] sample = menuController.getCsvSample();
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.CSV_FILE_RESPONSE, 0, sample);
+                }
+
+                // CSV 업로드 (중복 코드 모두 처리)
+                case ProtocolCode.CSV_MENU_UPLOAD_REQUEST:   // 0x21
+                case ProtocolCode.ADMIN_CSV_UPLOAD_REQUEST:  // 0x23
+                {
+                    byte[] csvData = (byte[]) req.getData();
+                    return menuController.registerMenuFromCSV(csvData);
                 }
 
                 default:
-                    System.out.println("알 수 없는 코드: 0x" + Integer.toHexString(code));
+                    System.out.println("알 수 없는 요청 코드: 0x" + Integer.toHexString(req.getCode()).toUpperCase());
                     return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
             }
         } catch (Exception e) {

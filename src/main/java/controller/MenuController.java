@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -98,6 +99,14 @@ public class MenuController {
         return target.toString();
     }
 
+    public byte[] getMenuImage(int menuPriceId) {
+        MenuPriceDTO menu = menupriceDAO.findById(menuPriceId);
+        if (menu != null && menu.getImageBytes() != null) {
+            return menu.getImageBytes();
+        }
+        return null; // 이미지가 없거나 메뉴 ID가 잘못된 경우
+    }
+
     private String extractExtension(String fileName) {
         int idx = fileName.lastIndexOf('.');
         if (idx == -1 || idx == fileName.length() - 1) {
@@ -132,32 +141,53 @@ public class MenuController {
         return true;
     }
 
+    public byte[] getCsvSample() {
+        String sample = "식당ID,식당명,날짜(yyyy-MM-dd),학기,식사시간,메뉴명,학생가,교직원가\n" +
+                "1,학생식당,2025-03-02,2025-1학기,점심,왕돈까스,5500,6500\n" +
+                "2,교직원식당,2025-03-02,2025-1학기,점심,김치찌개,6000,7000";
+        try {
+            return sample.getBytes("UTF-8");
+        } catch (Exception e) {
+            return new byte[0];
+        }
+    }
+
     public Protocol registerMenuFromCSV(byte[] csvFileBytes) {
         try {
-            String content = new String(csvFileBytes, "UTF-8"); // 인코딩 주의 (EUC-KR or UTF-8)
+            String content = new String(csvFileBytes, "UTF-8");
             String[] lines = content.split("\n");
-
             int successCount = 0;
+
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
             // 첫 번째 줄이 헤더일 경우 i=1부터 시작
             for (int i = 1; i < lines.length; i++) {
                 String line = lines[i].trim();
                 if (line.isEmpty()) continue;
 
-                // CSV 포맷: 식당ID,식당명,학기,식사시간,메뉴명,학생가,직원가
-                // 예: 1,학생식당,2025-1학기,점심,돈까스,5000,6000
+                // 포맷: 0:식당ID, 1:식당명, 2:날짜, 3:학기, 4:식사시간, 5:메뉴명, 6:학생가, 7:직원가
                 String[] tokens = line.split(",");
-
-                if (tokens.length < 7) continue;
+                if (tokens.length < 8) continue;
 
                 MenuPriceDTO menu = new MenuPriceDTO();
                 menu.setRestaurantId(Integer.parseInt(tokens[0].trim()));
                 menu.setRestaurantName(tokens[1].trim());
-                menu.setSemesterName(tokens[2].trim());
-                menu.setMealTime(tokens[3].trim()); // 아침/점심/저녁
-                menu.setMenuName(tokens[4].trim());
-                menu.setPriceStu(Integer.parseInt(tokens[5].trim()));
-                menu.setPriceFac(Integer.parseInt(tokens[6].trim()));
+
+                // [수정] 날짜 파싱 (LocalDate -> LocalDateTime)
+                try {
+                    String dateStr = tokens[2].trim();
+                    LocalDate date = LocalDate.parse(dateStr, formatter);
+                    menu.setDate(date.atStartOfDay()); // 00:00:00으로 설정
+                } catch (Exception e) {
+                    System.out.println("날짜 파싱 오류(" + i + "행): " + tokens[2]);
+                    continue; // 날짜 오류 시 해당 라인 스킵
+                }
+
+                menu.setSemesterName(tokens[3].trim());
+                menu.setMealTime(tokens[4].trim());
+                menu.setMenuName(tokens[5].trim());
+                menu.setPriceStu(Integer.parseInt(tokens[6].trim()));
+                menu.setPriceFac(Integer.parseInt(tokens[7].trim()));
                 menu.setCurrentSemester(true);
 
                 if (menupriceDAO.insertMenu(menu)) {
