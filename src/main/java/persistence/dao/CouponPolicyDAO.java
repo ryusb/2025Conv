@@ -33,7 +33,7 @@ public class CouponPolicyDAO {
         return Optional.empty(); // 정책이 없거나 오류 발생 시 빈 Optional 반환
     }
 
-    // 새로운 쿠폰 정책을 등록 (관리자 기능)
+    // 새로운 쿠폰 정책을 등록 
     public boolean insertPolicy(CouponPolicyDTO policy) {
         String sql = "INSERT INTO coupon_policy (coupon_price, effective_date) VALUES (?, ?)";
 
