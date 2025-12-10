@@ -30,13 +30,14 @@ public class Client {
                 System.out.println("1. 로그인 요청");
                 System.out.println("2. 개인 이용 내역 조회 (로그인 가정)");
                 System.out.println("3. 식당별 매출 현황 조회 (관리자)");
-                System.out.println("4. 종료");
+                System.out.println("4. 결제 요청 (영업시간 제한 테스트)"); // [추가됨]
+                System.out.println("5. 종료");
                 System.out.print("선택> ");
 
                 int choice = sc.nextInt();
                 sc.nextLine(); // 버퍼 비우기
 
-                if (choice == 4) break;
+                if (choice == 5) break;
 
                 Protocol request = null;
 
@@ -58,6 +59,21 @@ public class Client {
                     case 3: // 식당별 매출 현황 조회
                         // SALES_REPORT_REQUEST (0x18) 사용
                         request = new Protocol(ProtocolType.REQUEST, ProtocolCode.SALES_REPORT_REQUEST, null);
+                        break;
+
+                    case 4: // [추가됨] 결제 요청 테스트
+                        System.out.print("테스트할 메뉴 ID (MenuPriceId) 입력: ");
+                        int menuId = sc.nextInt();
+                        sc.nextLine();
+
+                        PaymentDTO paymentReq = new PaymentDTO();
+                        paymentReq.setMenuPriceId(menuId);
+                        paymentReq.setUserId(1); // 테스트용 유저 ID
+                        paymentReq.setUserType("학생"); // 테스트용 유저 타입
+                        // 쿠폰 없이 카드 결제로 가정
+
+                        // 0x07: PAYMENT_CARD_REQUEST
+                        request = new Protocol(ProtocolType.REQUEST, ProtocolCode.PAYMENT_CARD_REQUEST, paymentReq);
                         break;
 
                     default:
@@ -106,20 +122,31 @@ public class Client {
                     Object data = response.getData();
 
                     // 응답 코드 체크 수정
-                    if (response.getCode() == ProtocolCode.LOGIN_RESPONSE) { // 0x50
+                    if (response.getCode() == ProtocolCode.SUCCESS) { // 0x50
+                        System.out.println("✅ 처리 성공!");
+                    }
+                    else if (response.getCode() == ProtocolCode.FAIL) { // 0x51
+                        // 서버가 보낸 에러 메시지 출력 (예: 영업 시간이 아닙니다)
+                        System.out.println("❌ 처리 실패: " + data);
+                    }
+                    else if (response.getCode() == ProtocolCode.LOGIN_RESPONSE) { // 0x30
                         UserDTO user = (UserDTO) data;
                         System.out.println("✅ 로그인 성공: " + user.getLoginId());
-                    } else if (response.getCode() == ProtocolCode.USAGE_HISTORY_RESPONSE) { // 0x36
+                    }
+                    else if (response.getCode() == ProtocolCode.USAGE_HISTORY_RESPONSE) { // 0x36
                         List<PaymentDTO> list = (List<PaymentDTO>) data;
                         System.out.println("📄 내역 수: " + list.size());
-                        for (PaymentDTO p : list) System.out.println(" - " + p.getMenuName());
-                    } else if (response.getCode() == ProtocolCode.SALES_REPORT_RESPONSE) { // 0x38
+                        for (PaymentDTO p : list) System.out.println(" - " + p.getMenuName() + " (" + p.getStatus() + ")");
+                    }
+                    else if (response.getCode() == ProtocolCode.SALES_REPORT_RESPONSE) { // 0x38
                         Map<String, Long> sales = (Map<String, Long>) data;
                         System.out.println("💰 매출: " + sales);
-                    } else if (response.getCode() == ProtocolCode.INVALID_INPUT) { // 0x52
+                    }
+                    else if (response.getCode() == ProtocolCode.INVALID_INPUT) { // 0x52
                         System.out.println("❌ 로그인 실패: 아이디/비밀번호 불일치");
-                    } else {
-                        System.out.println("❌ 실패 또는 알 수 없는 응답");
+                    }
+                    else {
+                        System.out.println("⚠️ 알 수 없는 응답 코드입니다.");
                     }
                 }
             }
