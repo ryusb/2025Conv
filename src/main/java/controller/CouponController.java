@@ -85,6 +85,13 @@ public class CouponController {
                 : new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
     }
 
+    public Protocol getCouponPolicies() {
+        List<CouponPolicyDTO> list = couponPolicyDAO.findAllPolicies();
+
+        // ProtocolCode.COUPON_POLICY_LIST_RESPONSE (0x35) 사용
+        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.COUPON_POLICY_LIST_RESPONSE, list);
+    }
+
     private boolean isValid(CouponPolicyDTO policy) {
         if (policy == null) {
             return false;

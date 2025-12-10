@@ -11,6 +11,7 @@ import java.util.Map;
 import network.Protocol;
 import network.ProtocolCode;
 import network.ProtocolType;
+import persistence.dao.MenuPriceDAO;
 import persistence.dao.PaymentDAO;
 import persistence.dao.UserDAO;
 import persistence.dto.*;
@@ -22,8 +23,11 @@ public class ClientHandler extends Thread {
     private final MenuController menuController = new MenuController();
     private final CouponController couponController = new CouponController();
     private final PaymentController paymentController = new PaymentController();
+    private final PriceController priceController = new PriceController();
     private final UserDAO userDAO = new UserDAO();
     private final PaymentDAO paymentDAO = new PaymentDAO();
+
+    private UserDTO loginUser = null;
 
     public ClientHandler(Socket socket) {
         this.clientSocket = socket;
@@ -68,17 +72,52 @@ public class ClientHandler extends Thread {
 
     // 데이터 수신 헬퍼 메서드
     private byte[] readProtocol(InputStream is) throws IOException {
-        // 충분한 버퍼 크기 할당 (이미지 업로드 등 대비)
-        byte[] buffer = new byte[1024 * 1024 * 2];
-        int read = is.read(buffer);
-        if (read == -1) throw new IOException("EOF");
-        return java.util.Arrays.copyOf(buffer, read);
+        byte[] header = new byte[Protocol.HEADER_SIZE];
+        int totalRead = 0;
+
+        while (totalRead < Protocol.HEADER_SIZE) {
+            int read = is.read(header, totalRead, Protocol.HEADER_SIZE - totalRead);
+            if (read == -1) {
+                throw new IOException("EOF"); // 클라이언트 연결 종료
+            }
+            totalRead += read;
+        }
+
+        // 2. 데이터 길이 파악 (헤더의 2~5번째 바이트가 길이 정보)
+        int dataLength = java.nio.ByteBuffer.wrap(header, 2, 4).getInt();
+
+        // 3. 데이터 본문(Body) 끝까지 읽기
+        byte[] body = new byte[dataLength];
+        totalRead = 0;
+        while (totalRead < dataLength) {
+            int read = is.read(body, totalRead, dataLength - totalRead);
+            if (read == -1) throw new IOException("EOF");
+            totalRead += read;
+        }
+
+        // 4. 전체 패킷 합치기 (Protocol 생성자에게 넘겨주기 위함)
+        byte[] packet = new byte[Protocol.HEADER_SIZE + dataLength];
+        System.arraycopy(header, 0, packet, 0, Protocol.HEADER_SIZE);
+        if (dataLength > 0) {
+            System.arraycopy(body, 0, packet, Protocol.HEADER_SIZE, dataLength);
+        }
+
+        return packet;
     }
 
     // 핵심 로직: 프로토콜 코드에 따른 분기 처리
     private Protocol handleRequest(Protocol req) {
         if (req.getType() != ProtocolType.REQUEST) {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
+        }
+
+        // [추가] 권한 체크 로직 (관리자 기능 접근 제어)
+        // ProtocolCode 0x10 ~ 0x29 범위는 관리자 전용이라고 가정
+        if (req.getCode() >= 0x10 && req.getCode() <= 0x29) {
+            if (this.loginUser == null || !"admin".equals(this.loginUser.getUserType())) {
+                // 0x55: PERMISSION_DENIED 반환
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.PERMISSION_DENIED, "관리자 권한이 필요합니다.");
+            }
         }
 
         try {
@@ -99,9 +138,14 @@ public class ClientHandler extends Thread {
                 }
 
                 case ProtocolCode.MENU_LIST_REQUEST: { // 0x03
-                    // 예: 1번 식당, 점심 메뉴 조회 (클라이언트 데이터에 따라 동적 처리 가능)
-                    MenuPriceDTO menuPriceDTO = (MenuPriceDTO) req.getData();
-                    List<MenuPriceDTO> menus = menuController.getMenus(menuPriceDTO.getRestaurantId(), menuPriceDTO.getMealTime());
+                    Object data = req.getData();
+                    if (data == null || !(data instanceof MenuPriceDTO)) {
+                        return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, null);
+                    }
+                    MenuPriceDTO inputDto = (MenuPriceDTO) data;
+                    int restId = inputDto.getRestaurantId();
+                    String time = inputDto.getMealTime();
+                    List<MenuPriceDTO> menus = menuController.getMenus(restId, time);
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_LIST_RESPONSE, menus);
                 }
 
@@ -156,9 +200,24 @@ public class ClientHandler extends Thread {
                 case ProtocolCode.MENU_PHOTO_REGISTER_REQUEST: // 0x12
                     return menuController.uploadMenuImage((MenuPriceDTO) req.getData());
 
+                case ProtocolCode.PRICE_REGISTER_SNACK_REQUEST: // 0x13 (분식당 단일 메뉴 가격)
+                {
+                    return priceController.upsertMenuPriceForSemester((MenuPriceDTO) req.getData());
+                }
+
+                case ProtocolCode.PRICE_REGISTER_REGULAR_REQUEST: // 0x14 (학식/교직원 일괄 가격)
+                {
+                    return priceController.bulkUpdatePricesForSemester((MenuPriceDTO) req.getData());
+                }
+
                 // ==========================================
                 // III. 관리자 - 정책/보고서/CSV
                 // ==========================================
+                case ProtocolCode.COUPON_POLICY_LIST_REQUEST: // 0x15
+                {
+                    return couponController.getCouponPolicies();
+                }
+
                 case ProtocolCode.COUPON_POLICY_INSERT_REQUEST: // 0x16
                     return couponController.upsertCouponPolicy((CouponPolicyDTO) req.getData());
 
