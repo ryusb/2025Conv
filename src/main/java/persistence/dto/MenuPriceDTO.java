@@ -19,6 +19,7 @@ public class MenuPriceDTO implements DTO {
     private String menuName;
     private String imagePath;   // 메뉴 이미지 서버 경로
     private LocalDateTime date;        //메뉴 날짜
+    private String menuDate;    // YYYY-MM-DD (옵션 문자열)
     private int priceStu;       // 학생가
     private int priceFac;       // 직원가
     // 업로드용 추가 필드

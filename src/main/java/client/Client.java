@@ -10,6 +10,7 @@ import network.*;
 import persistence.dto.PaymentDTO;
 import persistence.dto.UserDTO;
 import service.AdminService;
+import service.UserService;
 
 public class Client {
     // ⚠️ TODO: 데스크톱의 실제 IP 주소를 여기에 입력하세요.
@@ -28,7 +29,7 @@ public class Client {
 
             while (true) {
                 System.out.println("\n=== [테스트 메뉴] ===");
-                System.out.println("1. 관리자 페이지 (로컬 실행)");
+                System.out.println("1. 로그인 후 메뉴 진입");
                 System.out.println("2. 개인 이용 내역 조회 (로그인 가정)");
                 System.out.println("3. 식당별 매출 현황 조회 (관리자)");
                 System.out.println("4. 종료");
@@ -42,10 +43,10 @@ public class Client {
                 Protocol request = null;
 
                 switch (choice) {
-                    case 1: // 로그인
+                    case 1: // 로그인 후 사용자 타입에 따라 메뉴 진입
                         UserDTO loginUser = new UserDTO();
-                        loginUser.setLoginId("insert");
-                        loginUser.setPassword("test");
+                        loginUser.setLoginId("admin");
+                        loginUser.setPassword("1234");
                         // LOGIN_REQUEST (0x02) 사용
                         request = new Protocol(ProtocolType.REQUEST, ProtocolCode.LOGIN_REQUEST, loginUser);
                         break;
@@ -107,9 +108,14 @@ public class Client {
                     Object data = response.getData();
 
                     // 응답 코드 체크 수정
-                    if (response.getCode() == ProtocolCode.LOGIN_RESPONSE) { // 0x50
+                    if (response.getCode() == ProtocolCode.LOGIN_RESPONSE) { // 로그인 성공
                         UserDTO user = (UserDTO) data;
-                        System.out.println("✅ 로그인 성공: " + user.getLoginId());
+                        System.out.println("✅ 로그인 성공: " + user.getLoginId() + " (" + user.getUserType() + ")");
+                        if ("admin".equalsIgnoreCase(user.getUserType())) {
+                            AdminService.mainService();
+                        } else {
+                            UserService.mainService();
+                        }
                     } else if (response.getCode() == ProtocolCode.USAGE_HISTORY_RESPONSE) { // 0x36
                         List<PaymentDTO> list = (List<PaymentDTO>) data;
                         System.out.println("📄 내역 수: " + list.size());
