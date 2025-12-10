@@ -4,16 +4,18 @@ import client.NetworkClient;
 import network.Protocol;
 import network.ProtocolType;
 import network.ProtocolCode;
+import persistence.dao.RestaurantDAO;
 import persistence.dto.MenuPriceDTO;
 import persistence.dto.PaymentDTO;
+import persistence.dto.RestaurantDTO;
 import util.InputHandler;
 import util.OutputHandler;
+import util.TimeSlotUtil;
 
 import java.io.FileOutputStream;
 import java.util.List;
 
 public class OrderService {
-
     /* 공통 응답 검증 */
     private static boolean isResponseOK(Protocol res) {
         if (res == null) return false;
@@ -21,20 +23,31 @@ public class OrderService {
                 res.getType() == ProtocolType.RESULT);
     }
 
-
     /* --------------------------------------------------------
      * 1. 메뉴 목록 조회
      * -------------------------------------------------------- */
     public static void order(String restaurant) {
+        MenuPriceDTO dto = new MenuPriceDTO();
+        int id = RestaurantDAO.findRestaurantIdByName(restaurant);
+        dto.setRestaurantName(restaurant);
+        dto.setRestaurantId(id);
+
+        RestaurantDTO rest = RestaurantDAO.findById(id);
+        if (rest == null) {
+            OutputHandler.showError("식당 정보를 가져오지 못했습니다.");
+            return;
+        }
+
+        String mealTime = TimeSlotUtil.getCurrentOrNearestMealTime(rest);
+        dto.setMealTime(mealTime);
 
         Protocol response = NetworkClient.sendRequest(
                 ProtocolCode.MENU_LIST_REQUEST,
-                restaurant               // String → 목록 요청
+                dto
         );
 
         if (!isResponseOK(response) ||
             response.getCode() != ProtocolCode.MENU_LIST_RESPONSE) {
-
             OutputHandler.showError("메뉴 조회 실패");
             return;
         }
@@ -45,7 +58,9 @@ public class OrderService {
             return;
         }
 
+        // 안전하게 role 가져오기, null이면 "student"로 기본
         String role = UserSession.getRole();
+        if (role == null) role = "student";
 
         OutputHandler.showTitle("메뉴 목록");
 
@@ -53,9 +68,7 @@ public class OrderService {
             MenuPriceDTO m = menus.get(i);
             if (m == null) continue;
 
-            int appliedPrice = role.equals("student")
-                    ? m.getPriceStu()
-                    : m.getPriceFac();
+            int appliedPrice = "student".equals(role) ? m.getPriceStu() : m.getPriceFac();
 
             System.out.println((i + 1) + ". " + m.getMenuName()
                     + " - " + appliedPrice + "원");
@@ -67,7 +80,7 @@ public class OrderService {
             int choice = InputHandler.getInt("입력");
 
             switch (choice) {
-                case 1 -> loop = orderByRestaurant();
+                case 1 -> loop = orderByMenu(menus);
                 case 2 -> imageDownload();
                 case 3 -> loop = false;
                 default -> OutputHandler.showError("잘못된 입력입니다.");
@@ -75,48 +88,39 @@ public class OrderService {
         }
     }
 
-
     /* --------------------------------------------------------
-     * 2. 메뉴 상세 조회 (ProtocolCode 추가 없이 처리)
+     * 2. 메뉴 상세 조회 및 주문
      * -------------------------------------------------------- */
-    private static boolean orderByRestaurant() {
-        int menuPriceId = InputHandler.getInt("주문할 메뉴 ID");
-        int userId = UserSession.getUserId();
-        String role = UserSession.getRole();
-
-        // ⭐ 여기서도 동일한 프로토콜 사용
-        Protocol menuRes = NetworkClient.sendRequest(
-                ProtocolCode.MENU_LIST_REQUEST,
-                menuPriceId              // int → 상세 메뉴 요청
-        );
-
-        if (!isResponseOK(menuRes) ||
-            menuRes.getCode() != ProtocolCode.MENU_LIST_RESPONSE) {
-
-            OutputHandler.showError("메뉴 정보를 가져오지 못했습니다.");
-            return false;
+    private static boolean orderByMenu(List<MenuPriceDTO> menus) {
+        int menuChoice = InputHandler.getInt("주문할 메뉴 번호");
+        if (menuChoice < 1 || menuChoice > menus.size()) {
+            OutputHandler.showError("잘못된 메뉴 번호");
+            return true;
         }
 
-        // 서버가 MenuPriceDTO 하나를 보내줘야 함
-        MenuPriceDTO menu = (MenuPriceDTO) menuRes.getData();
+        MenuPriceDTO menu = menus.get(menuChoice - 1);
         if (menu == null) {
             OutputHandler.showError("메뉴 정보가 비었습니다.");
-            return false;
+            return true;
         }
 
-        int appliedPrice = role.equals("student") ? menu.getPriceStu() : menu.getPriceFac();
+        int userId = UserSession.getUserId();
+        String role = UserSession.getRole();
+        if (role == null) role = "student"; // 기본값
+
+        int appliedPrice = "student".equals(role) ? menu.getPriceStu() : menu.getPriceFac();
 
         OutputHandler.showMessage("선택한 메뉴: " + menu.getMenuName());
         OutputHandler.showMessage("가격: " + appliedPrice + "원");
 
         OutputHandler.showTitle("주문 확인 (Y/N)");
         char ans = InputHandler.getChar("입력");
-        if (ans == 'N') return false;
+        if (ans == 'N' || ans == 'n') return true;
 
         // 결제 정보 구성
         PaymentDTO dto = new PaymentDTO();
         dto.setUserId(userId);
-        dto.setMenuPriceId(menuPriceId);
+        dto.setMenuPriceId(menu.getMenuPriceId());
         dto.setMenuName(menu.getMenuName());
         dto.setMenuPriceAtTime(appliedPrice);
         dto.setRestaurantId(menu.getRestaurantId());
@@ -124,8 +128,8 @@ public class OrderService {
         dto.setUserType(role);
 
         // 쿠폰 결제
-        boolean useCoupon = InputHandler.getChar("쿠폰 사용? (Y/N)") == 'Y';
-        if (useCoupon) {
+        char couponAns = InputHandler.getChar("쿠폰 사용? (Y/N)");
+        if (couponAns == 'Y' || couponAns == 'y') {
             Protocol res = NetworkClient.sendRequest(
                     ProtocolCode.PAYMENT_COUPON_REQUEST,
                     dto
@@ -140,16 +144,14 @@ public class OrderService {
                 ProtocolCode.PAYMENT_CARD_REQUEST,
                 dto
         );
-
         if (cardRes != null && cardRes.getCode() == ProtocolCode.SUCCESS) {
             OutputHandler.showSuccess("결제 완료");
         } else {
             OutputHandler.showError("카드 결제 실패");
         }
 
-        return false;
+        return true;
     }
-
 
     /* --------------------------------------------------------
      * 3. 이미지 다운로드
@@ -164,7 +166,6 @@ public class OrderService {
 
         if (!isResponseOK(res) ||
             res.getCode() != ProtocolCode.MENU_IMAGE_RESPONSE) {
-
             OutputHandler.showError("이미지 다운로드 실패");
             return;
         }
@@ -179,10 +180,9 @@ public class OrderService {
             fos.write(img);
             OutputHandler.showSuccess("이미지 다운로드 완료");
         } catch (Exception e) {
-            OutputHandler.showError("이미지 저장 실패");
+            OutputHandler.showError("이미지 저장 실패: " + e.getMessage());
         }
     }
-
 
     /* --------------------------------------------------------
      * 4. 결제 내역 조회
@@ -197,13 +197,11 @@ public class OrderService {
 
         if (!isResponseOK(response) ||
             response.getCode() != ProtocolCode.USAGE_HISTORY_RESPONSE) {
-
             OutputHandler.showError("내역 조회 실패");
             return;
         }
 
         List<PaymentDTO> list = (List<PaymentDTO>) response.getData();
-
         if (list == null || list.isEmpty()) {
             OutputHandler.showMessage("결제 내역이 없습니다.");
             return;

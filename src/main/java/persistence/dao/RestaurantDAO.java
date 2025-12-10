@@ -44,7 +44,7 @@ public class RestaurantDAO {
     }
 
     // 식당 이름으로 식당 ID를 조회 (결제 처리에 필요)
-    public int findRestaurantIdByName(String name) {
+    public static int findRestaurantIdByName(String name) {
         String sql = "SELECT restaurant_id FROM restaurant WHERE name = ?";
         int id = -1;
 
@@ -63,7 +63,7 @@ public class RestaurantDAO {
         return id;
     }
 
-    public RestaurantDTO findById(int restaurantId) {
+    public static RestaurantDTO findById(int restaurantId) {
         String sql = "SELECT * FROM restaurant WHERE restaurant_id = ?";
         RestaurantDTO restaurant = null;
 

@@ -16,26 +16,26 @@ public class Client {
     private static final int PORT = 9000;
 
     public static void main(String[] args) {
-            try (
-                    Socket socket = new Socket(SERVER_IP, PORT);
-                    OutputStream os = socket.getOutputStream();
-                    InputStream is = socket.getInputStream()
-            ) {
-                System.out.println("🎉 서버 (" + SERVER_IP + ")에 성공적으로 접속했습니다.");
-                ClientSocketHolder.init(is, os);
+        try (
+                Socket socket = new Socket(SERVER_IP, PORT);
+                OutputStream os = socket.getOutputStream();
+                InputStream is = socket.getInputStream()
+        ) {
+            System.out.println("🎉 서버 (" + SERVER_IP + ")에 성공적으로 접속했습니다.");
+            ClientSocketHolder.init(is, os);
 
-                // =================================================
-                // ✔ MainService.run() 이 로그인 + 권한 분기 담당
-                // =================================================
-                MainService.run();
+            // =================================================
+            // ✔ MainService.run() 이 로그인 + 권한 분기 담당
+            // =================================================
+            MainService.run();
 
-                System.out.println("클라이언트 종료.");
+            System.out.println("클라이언트 종료.");
 
-            } catch (Exception e) {
-                System.err.println("❌ 클라이언트 오류: " + e.getMessage());
-                e.printStackTrace();
-            }
+        } catch (Exception e) {
+            System.err.println("❌ 클라이언트 오류: " + e.getMessage());
+            e.printStackTrace();
         }
+    }
 
     // =======================
     //  패킷 수신 전용 메서드

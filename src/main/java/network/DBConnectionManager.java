@@ -15,7 +15,6 @@ public class DBConnectionManager {
         try {
             // 1. JDBC 드라이버 로드
             Class.forName(DBConfig.DRIVER);
-            System.out.println("✅ JDBC Driver 로드 성공");
 
             // 2. DB 연결 설정 및 Connection 객체 반환
             Connection conn = DriverManager.getConnection(
