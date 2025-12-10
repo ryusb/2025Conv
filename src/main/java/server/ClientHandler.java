@@ -2,12 +2,12 @@ package server;
 
 import controller.MenuController;
 import controller.CouponController;
+import controller.PriceController;
 import controller.PaymentController;
 import java.io.*;
 import java.net.Socket;
 import java.util.List;
 import java.util.Map;
-
 import network.Protocol;
 import network.ProtocolCode;
 import network.ProtocolType;
