@@ -39,8 +39,8 @@ public class ProtocolCode {
     // Type: RESPONSE (서버 -> 클라이언트) - 0x30번대 사용
     // -----------------------------------------------------------
     // 요청에 대한 데이터 페이로드(DTO)를 포함하는 응답 코드입니다.
-    // public static final byte LOGIN_RESPONSE = 0x30;              // 로그인 성공 응답 (User DTO 포함)
-    // public static final byte SIGNUP_RESPONSE = 0x31;             // 회원가입 성공 응답 (성공 메시지)
+    public static final byte LOGIN_RESPONSE = 0x30;              // 로그인 성공 응답 (User DTO 포함)
+    public static final byte SIGNUP_RESPONSE = 0x31;             // 회원가입 성공 응답 (성공 메시지)
     public static final byte MENU_LIST_RESPONSE = 0x32;          // 메뉴 목록 응답 (Menu DTO List 포함)
     public static final byte MENU_IMAGE_RESPONSE = 0x33;         // 메뉴 이미지 응답 (Raw Image Binary Data 포함)
     public static final byte COUPON_LIST_RESPONSE = 0x34;        // 쿠폰 목록 응답

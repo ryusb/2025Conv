@@ -106,7 +106,7 @@ public class Client {
                     Object data = response.getData();
 
                     // 응답 코드 체크 수정
-                    if (response.getCode() == ProtocolCode.SUCCESS) { // 0x50
+                    if (response.getCode() == ProtocolCode.LOGIN_RESPONSE) { // 0x50
                         UserDTO user = (UserDTO) data;
                         System.out.println("✅ 로그인 성공: " + user.getLoginId());
                     } else if (response.getCode() == ProtocolCode.USAGE_HISTORY_RESPONSE) { // 0x36

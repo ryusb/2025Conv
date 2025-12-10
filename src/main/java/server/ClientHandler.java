@@ -21,7 +21,7 @@ public class ClientHandler extends Thread {
     private final Socket clientSocket;
     private final MenuController menuController = new MenuController();
     private final CouponController couponController = new CouponController();
-    private final PaymentController paymentController = new PaymentController(); // 추가됨
+    private final PaymentController paymentController = new PaymentController();
     private final UserDAO userDAO = new UserDAO();
 
     // 생성자: 클라이언트 소켓을 받아서 초기화합니다.
@@ -35,17 +35,31 @@ public class ClientHandler extends Thread {
                 InputStream inputStream = clientSocket.getInputStream();
                 OutputStream outputStream = clientSocket.getOutputStream();
         ) {
-            byte[] receivedData = readProtocolFromClient(inputStream);
-            Protocol receivedProtocol = new Protocol(receivedData);
+            while (true) {
+                // 1. 요청 수신
+                byte[] receivedData;
+                try {
+                    receivedData = readProtocolFromClient(inputStream);
+                } catch (IOException e) {
+                    // 클라이언트 연결 종료 시 루프 탈출
+                    System.out.println("클라이언트 연결 종료: " + clientSocket.getInetAddress());
+                    break;
+                }
 
-            System.out.println("수신된 요청 - 타입: " + receivedProtocol.getType() +
-                    ", 코드: 0x" + Integer.toHexString(receivedProtocol.getCode() & 0xFF).toUpperCase());
+                if (receivedData == null) {
+                    break;
+                }
 
-            Protocol response = handleRequest(receivedProtocol);
+                Protocol receivedProtocol = new Protocol(receivedData);
+                System.out.println("수신된 요청 - 코드: 0x" + Integer.toHexString(receivedProtocol.getCode() & 0xFF).toUpperCase());
 
-            outputStream.write(response.getBytes());
-            outputStream.flush();
+                // 2. 요청 처리
+                Protocol response = handleRequest(receivedProtocol);
 
+                // 3. 응답 전송
+                outputStream.write(response.getBytes());
+                outputStream.flush();
+            }
         } catch (Exception e) {
             System.err.println("클라이언트 처리 중 오류 발생: " + e.getMessage());
         } finally {
@@ -84,31 +98,22 @@ public class ClientHandler extends Thread {
                     UserDTO u = (UserDTO) receivedProtocol.getData();
                     UserDTO resultUser = userDAO.findUserByLoginId(u.getLoginId(), u.getPassword());
                     if (resultUser != null) {
-                        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.SUCCESS, 0, resultUser);
-                    } else {
-                        // INVALID_CREDENTIALS 대신 INVALID_INPUT 사용
-                        return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, 0, null);
+                        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, 0, resultUser);                    } else {
                     }
+                    return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, 0, null); // 또는 INVALID_INPUT
                 }
 
                 // --- 2. 메뉴 관련 ---
-                case ProtocolCode.MENU_LIST_REQUEST: {
-                    // 예: 전체 메뉴 혹은 오늘 메뉴 조회
-                    // 클라이언트에서 조건을 보냈다면 받아서 처리 (여기선 예시로 특정 시간대 조회)
+                case ProtocolCode.MENU_LIST_REQUEST: // 또는 MENU_LIST_REQUEST
+                {
+                    // 예시: 1번 식당, 점심 메뉴 조회
                     List<MenuPriceDTO> menus = menuController.getMenus(1, "점심");
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_LIST_RESPONSE, 0, menus);
                 }
 
-                case ProtocolCode.MENU_IMAGE_DOWNLOAD_REQUEST: {
-                    int menuId = (int) receivedProtocol.getData();
-                    // 이미지 다운로드는 구현 필요 (MenuPriceDAO.findById 사용)
-                    return new Protocol(ProtocolType.RESULT, ProtocolCode.NOT_FOUND, 0, null);
-                }
-
                 // --- 3. 결제 관련 ---
-                case ProtocolCode.PAYMENT_CARD_REQUEST:
-                case ProtocolCode.PAYMENT_COUPON_REQUEST: {
-                    // 카드, 쿠폰 결제 모두 PaymentController가 처리 (DTO 안에 구분 정보 포함 가정)
+                case ProtocolCode.PAYMENT_CARD_REQUEST: // 카드 결제 요청 코드 사용 시
+                {
                     PaymentDTO paymentReq = (PaymentDTO) receivedProtocol.getData();
                     return paymentController.processPayment(paymentReq);
                 }
@@ -121,9 +126,7 @@ public class ClientHandler extends Thread {
                 }
 
                 // --- 4. 관리자 기능 ---
-                case ProtocolCode.MENU_INSERT_REQUEST:
-                case ProtocolCode.MENU_UPDATE_REQUEST: {
-                    // 등록과 수정을 하나의 컨트롤러 메서드에서 처리하거나 분기
+                case ProtocolCode.MENU_INSERT_REQUEST: {
                     return menuController.registerOrUpdateMenu((MenuPriceDTO) receivedProtocol.getData());
                 }
 
@@ -139,12 +142,6 @@ public class ClientHandler extends Thread {
                     PaymentDAO dao = new PaymentDAO();
                     Map<String, Long> stats = dao.getSalesStatsByRestaurant();
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.SALES_REPORT_RESPONSE, 0, stats);
-                }
-
-                // [신규] CSV 파일 업로드
-                case ProtocolCode.CSV_MENU_UPLOAD_REQUEST: {
-                    byte[] csvBytes = (byte[]) receivedProtocol.getData(); // Byte 배열로 받는다고 가정
-                    return menuController.registerMenuFromCSV(csvBytes);
                 }
 
                 default:

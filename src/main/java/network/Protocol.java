@@ -59,20 +59,12 @@ public class Protocol {
         }
 
         else if (type == ProtocolType.RESULT) {
-            // [수정됨] 0x50 ~ 0x5F 사이의 코드는 모두 Result 코드로 인정하여 null 반환
+            // 0x50 ~ 0x5F 사이의 코드는 모두 Result 코드로 인정하여 null 반환
             // SUCCESS(0x50) ~ SERVER_ERROR(0x5F)
             if (code >= ProtocolCode.SUCCESS && code <= ProtocolCode.SERVER_ERROR) {
                 return null;
             }
         }
-
-        try {
-            String hexCode = Integer.toHexString(code & 0xFF).toUpperCase();
-            throw new Exception("타입과 코드가 맞지 않음. Type: " + type + ", Code: 0x" + hexCode);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
         return null;
     }
 
