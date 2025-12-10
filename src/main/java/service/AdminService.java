@@ -3,21 +3,21 @@ package service;
 import util.InputHandler;
 import util.OutputHandler;
 import persistence.dto.MenuPriceDTO;
+import persistence.dto.CouponPolicyDTO;
+import persistence.dto.PaymentDTO;
+import network.ClientSocketHolder;
 import network.Protocol;
 import network.ProtocolCode;
 import network.ProtocolType;
 
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.Socket;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class AdminService {
-    private static final String SERVER_IP = "118.216.49.188";
-    private static final int PORT = 9000;
-
     public static void mainService() {
         int choice;
         boolean isRunning = true;
@@ -30,12 +30,172 @@ public class AdminService {
                 case 1 -> registerMenu();
                 case 2 -> updateMenu();
                 case 3 -> System.out.println("");
-                case 4 -> System.out.println("");
-                case 5 -> System.out.println("");
+                case 4 -> couponPolicyMenu();
+                case 5 -> paymentHistoryMenu();
                 case 6 -> System.out.println("");
                 case 7 -> isRunning = false;
                 default -> OutputHandler.showError("잘못된 선택입니다");
             }
+        }
+    }
+
+    private static void couponPolicyMenu() {
+        boolean running = true;
+        while (running) {
+            OutputHandler.showBar();
+            OutputHandler.showTitle("쿠폰 관리");
+            OutputHandler.showMenu(1, "정책 조회");
+            OutputHandler.showMenu(2, "정책 등록");
+            OutputHandler.showMenu(3, "뒤로가기");
+            OutputHandler.showBar();
+
+            switch (InputHandler.getInt("입력")) {
+                case 1 -> viewCouponPolicies();
+                case 2 -> registerCouponPolicy();
+                case 3 -> running = false;
+                default -> OutputHandler.showError("잘못된 선택입니다");
+            }
+        }
+    }
+
+    private static void viewCouponPolicies() {
+        Protocol res = sendRequest(new Protocol(ProtocolType.REQUEST, ProtocolCode.COUPON_POLICY_LIST_REQUEST, null));
+        if (res == null || res.getCode() != ProtocolCode.COUPON_POLICY_LIST_RESPONSE) {
+            OutputHandler.showError("정책 조회 실패");
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        List<CouponPolicyDTO> list = (List<CouponPolicyDTO>) res.getData();
+        if (list == null || list.isEmpty()) {
+            OutputHandler.showMessage("등록된 정책이 없습니다.");
+            return;
+        }
+        OutputHandler.showTitle("쿠폰 정책 목록");
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        for (CouponPolicyDTO p : list) {
+            String eff = p.getEffectiveDate() == null ? "-" : p.getEffectiveDate().format(fmt);
+            OutputHandler.showMessage("ID: " + p.getPolicyId() + " | 가격: " + p.getCouponPrice() + " | 적용: " + eff);
+        }
+    }
+
+    private static void registerCouponPolicy() {
+        int price = InputHandler.getInt("쿠폰 가격(원)");
+        if (price <= 0) {
+            OutputHandler.showError("가격은 양수여야 합니다.");
+            return;
+        }
+        String dateStr = InputHandler.getString("적용 시작 시각 입력 (yyyy-MM-dd HH:mm, 비우면 지금)");
+
+        CouponPolicyDTO dto = new CouponPolicyDTO();
+        dto.setCouponPrice(price);
+        if (dateStr != null && !dateStr.isBlank()) {
+            try {
+                DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+                dto.setEffectiveDate(LocalDateTime.parse(dateStr, fmt));
+            } catch (DateTimeParseException e) {
+                OutputHandler.showError("날짜 형식이 올바르지 않습니다.");
+                return;
+            }
+        }
+
+        Protocol res = sendRequest(new Protocol(ProtocolType.REQUEST, ProtocolCode.COUPON_POLICY_INSERT_REQUEST, dto));
+        if (res != null && res.getCode() == ProtocolCode.SUCCESS) {
+            OutputHandler.showSuccess("정책이 등록되었습니다.");
+        } else {
+            OutputHandler.showError("정책 등록 실패");
+        }
+    }
+
+    private static void paymentHistoryMenu() {
+        boolean running = true;
+        while (running) {
+            OutputHandler.showBar();
+            OutputHandler.showTitle("주문/결제 내역 조회");
+            OutputHandler.showMenu(1, "식당별 내역");
+            OutputHandler.showMenu(2, "기간별 내역");
+            OutputHandler.showMenu(3, "식당+기간 내역");
+            OutputHandler.showMenu(4, "뒤로가기");
+            OutputHandler.showBar();
+
+            switch (InputHandler.getInt("입력")) {
+                case 1 -> fetchPaymentHistory(selectRestaurantId(), null, null);
+                case 2 -> {
+                    LocalDateTime[] range = askPeriod();
+                    if (range != null) fetchPaymentHistory(null, range[0], range[1]);
+                }
+                case 3 -> {
+                    int rid = selectRestaurantId();
+                    LocalDateTime[] range = askPeriod();
+                    if (range != null) fetchPaymentHistory(rid, range[0], range[1]);
+                }
+                case 4 -> running = false;
+                default -> OutputHandler.showError("잘못된 선택입니다");
+            }
+        }
+    }
+
+    private static LocalDateTime[] askPeriod() {
+        String startStr = InputHandler.getString("시작 시각 (yyyy-MM-dd HH:mm)");
+        String endStr = InputHandler.getString("종료 시각 (yyyy-MM-dd HH:mm)");
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        try {
+            LocalDateTime start = LocalDateTime.parse(startStr, fmt);
+            LocalDateTime end = LocalDateTime.parse(endStr, fmt);
+            return new LocalDateTime[]{start, end};
+        } catch (DateTimeParseException e) {
+            OutputHandler.showError("날짜 형식이 올바르지 않습니다.");
+            return null;
+        }
+    }
+
+    private static int selectRestaurantId() {
+        OutputHandler.showMessage("식당 선택: 1) stdCafeteria  2) facCafeteria  3) snack");
+        int restaurantChoice = InputHandler.getInt("선택(1~3)");
+        int restaurantId = mapRestaurantId(restaurantChoice);
+        if (restaurantId == -1) {
+            OutputHandler.showError("잘못된 식당 선택입니다.");
+        }
+        return restaurantId;
+    }
+
+    private static void fetchPaymentHistory(Integer restaurantId, LocalDateTime start, LocalDateTime end) {
+        Map<String, Object> payload = new HashMap<>();
+        if (restaurantId != null && restaurantId > 0) {
+            payload.put("restaurantId", restaurantId);
+        }
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        if (start != null && end != null) {
+            payload.put("start", start.format(fmt));
+            payload.put("end", end.format(fmt));
+        }
+
+        Protocol res = sendRequest(new Protocol(ProtocolType.REQUEST, ProtocolCode.ORDER_PAYMENT_HISTORY_REQUEST, payload));
+        if (res == null) {
+            OutputHandler.showError("조회 실패(응답 없음)");
+            return;
+        }
+        if (res.getCode() != ProtocolCode.ORDER_PAYMENT_HISTORY_RESPONSE) {
+            OutputHandler.showError("조회 실패: 코드 " + res.getCode());
+            return;
+        }
+
+        @SuppressWarnings("unchecked")
+        List<PaymentDTO> list = (List<PaymentDTO>) res.getData();
+        if (list == null || list.isEmpty()) {
+            OutputHandler.showMessage("내역이 없습니다.");
+            return;
+        }
+
+        OutputHandler.showTitle("결제 내역");
+        for (PaymentDTO p : list) {
+            String time = p.getPaymentTime() == null ? "-" : p.getPaymentTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+            int total = p.getCouponValueUsed() + p.getAdditionalCardAmount();
+            OutputHandler.showMessage(
+                    time + " | " +
+                            p.getRestaurantName() + " | " +
+                            p.getMenuName() + " | " +
+                            total + "원 (쿠폰 " + p.getCouponValueUsed() + ", 카드 " + p.getAdditionalCardAmount() + ")"
+            );
         }
     }
 
@@ -91,6 +251,7 @@ public class AdminService {
             OutputHandler.showSuccess("메뉴 등록 요청이 성공적으로 처리되었습니다.");
         } else {
             OutputHandler.showError("메뉴 등록 요청 실패");
+            System.out.println(response.getCode());
         }
     }
 
@@ -161,6 +322,7 @@ public class AdminService {
             OutputHandler.showSuccess("메뉴 수정 요청이 성공적으로 처리되었습니다.");
         } else {
             OutputHandler.showError("메뉴 수정 요청 실패");
+
         }
     }
 
@@ -184,18 +346,14 @@ public class AdminService {
 
     // Client.java의 간단한 송수신 로직을 참고한 요청/응답 처리
     private static Protocol sendRequest(Protocol request) {
-        try (
-                Socket socket = new Socket(SERVER_IP, PORT);
-                OutputStream os = socket.getOutputStream();
-                InputStream is = socket.getInputStream()
-        ) {
-            os.write(request.getBytes());
-            os.flush();
+        try {
+            ClientSocketHolder.os.write(request.getBytes());
+            ClientSocketHolder.os.flush();
 
             byte[] header = new byte[6];
             int totalRead = 0;
             while (totalRead < 6) {
-                int read = is.read(header, totalRead, 6 - totalRead);
+                int read = ClientSocketHolder.is.read(header, totalRead, 6 - totalRead);
                 if (read == -1) break;
                 totalRead += read;
             }
@@ -211,7 +369,7 @@ public class AdminService {
             byte[] body = new byte[dataLength];
             totalRead = 0;
             while (totalRead < dataLength) {
-                int read = is.read(body, totalRead, dataLength - totalRead);
+                int read = ClientSocketHolder.is.read(body, totalRead, dataLength - totalRead);
                 if (read == -1) break;
                 totalRead += read;
             }

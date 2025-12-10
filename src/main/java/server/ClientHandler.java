@@ -8,11 +8,15 @@ import java.io.*;
 import java.net.Socket;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import network.Protocol;
 import network.ProtocolCode;
 import network.ProtocolType;
 import persistence.dao.MenuPriceDAO;
 import persistence.dao.PaymentDAO;
+import persistence.dao.RestaurantDAO;
 import persistence.dao.UserDAO;
 import persistence.dto.*;
 
@@ -110,16 +114,15 @@ public class ClientHandler extends Thread {
         if (req.getType() != ProtocolType.REQUEST) {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
         }
-
         // [추가] 권한 체크 로직 (관리자 기능 접근 제어)
         // ProtocolCode 0x10 ~ 0x29 범위는 관리자 전용이라고 가정
         if (req.getCode() >= 0x10 && req.getCode() <= 0x29) {
-            if (this.loginUser == null || !"admin".equals(this.loginUser.getUserType())) {
+            if (this.loginUser == null ||
+                    !("admin".equalsIgnoreCase(this.loginUser.getUserType()) || "관리자".equals(this.loginUser.getUserType()))) {
                 // 0x55: PERMISSION_DENIED 반환
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.PERMISSION_DENIED, "관리자 권한이 필요합니다.");
             }
         }
-
         try {
             switch (req.getCode()) {
                 // ==========================================
@@ -129,6 +132,7 @@ public class ClientHandler extends Thread {
                     UserDTO u = (UserDTO) req.getData();
                     UserDTO result = userDAO.findUserByLoginId(u.getLoginId(), u.getPassword());
                     if (result != null) {
+                        this.loginUser = result; // 세션에 로그인 사용자 저장
                         // 성공 시 LOGIN_RESPONSE (0x30) + 유저 데이터 반환
                         return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, result);
                     } else {
@@ -195,7 +199,41 @@ public class ClientHandler extends Thread {
                 // ==========================================
                 case ProtocolCode.MENU_INSERT_REQUEST:       // 0x10
                 case ProtocolCode.MENU_UPDATE_REQUEST:       // 0x11
-                    return menuController.registerOrUpdateMenu((MenuPriceDTO) req.getData());
+                {
+                    MenuPriceDTO dto = (MenuPriceDTO) req.getData();
+
+                    // 클라이언트가 전달한 restaurantId가 없으면 이름 기반 매핑/조회로 채움
+                    if (dto.getRestaurantId() <= 0) {
+                        String name = dto.getRestaurantName();
+                        if (name != null) {
+                            // 기본 매핑 (클라이언트 영문 코드명 처리)
+                            dto.setRestaurantId(
+                                    switch (name) {
+                                        case "stdCafeteria" -> 1;
+                                        case "facCafeteria" -> 2;
+                                        case "snack" -> 3;
+                                        default -> dto.getRestaurantId();
+                                    });
+                        }
+
+                        // 그래도 0 이하이면 DB에서 이름으로 조회
+                        if (dto.getRestaurantId() <= 0 && name != null) {
+                            RestaurantDAO dao = new RestaurantDAO();
+                            dto.setRestaurantId(dao.findRestaurantIdByName(name));
+                        }
+                    }
+
+                    // 이름이 없고 id만 있는 경우 DB로 이름 채움
+                    if ((dto.getRestaurantName() == null || dto.getRestaurantName().isBlank()) && dto.getRestaurantId() > 0) {
+                        RestaurantDAO dao = new RestaurantDAO();
+                        RestaurantDTO resto = dao.findById(dto.getRestaurantId());
+                        if (resto != null) {
+                            dto.setRestaurantName(resto.getName());
+                        }
+                    }
+
+                    return menuController.registerOrUpdateMenu(dto);
+                }
 
                 case ProtocolCode.MENU_PHOTO_REGISTER_REQUEST: // 0x12
                     return menuController.uploadMenuImage((MenuPriceDTO) req.getData());
@@ -222,9 +260,38 @@ public class ClientHandler extends Thread {
                     return couponController.upsertCouponPolicy((CouponPolicyDTO) req.getData());
 
                 case ProtocolCode.ORDER_PAYMENT_HISTORY_REQUEST: { // 0x17
-                    // 식당별 결제 내역 (클라이언트에서 식당ID 전송 가정)
-                    int restaurantId = (int) req.getData();
-                    List<PaymentDTO> list = paymentDAO.findHistoryByRestaurantId(restaurantId);
+                    Object data = req.getData();
+                    Integer restaurantId = null;
+                    LocalDateTime start = null;
+                    LocalDateTime end = null;
+
+                    if (data instanceof Integer i) {
+                        restaurantId = i;
+                    } else if (data instanceof Map<?, ?> map) {
+                        Object rid = map.get("restaurantId");
+                        if (rid instanceof Integer) {
+                            restaurantId = (Integer) rid;
+                        }
+                        Object s = map.get("start");
+                        Object e = map.get("end");
+                        if (s instanceof String) start = parseDateTime((String) s);
+                        if (e instanceof String) end = parseDateTime((String) e);
+                    }
+
+                    List<PaymentDTO> list;
+                    if (start != null && end != null) {
+                        if (restaurantId != null && restaurantId > 0) {
+                            list = paymentDAO.findHistoryByRestaurantAndPeriod(restaurantId, start, end);
+                        } else {
+                            list = paymentDAO.findHistoryByPeriod(start, end);
+                        }
+                    } else if (restaurantId != null && restaurantId > 0) {
+                        list = paymentDAO.findHistoryByRestaurantId(restaurantId);
+                    } else {
+                        // 필터가 없으면 잘못된 요청으로 처리
+                        return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, "조회 조건이 없습니다.");
+                    }
+
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.ORDER_PAYMENT_HISTORY_RESPONSE, list);
                 }
 
@@ -262,6 +329,19 @@ public class ClientHandler extends Thread {
         } catch (Exception e) {
             e.printStackTrace();
             return new Protocol(ProtocolType.RESULT, ProtocolCode.SERVER_ERROR, null);
+        }
+    }
+
+    private LocalDateTime parseDateTime(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        try {
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+            return LocalDateTime.parse(text, fmt);
+        } catch (DateTimeParseException e) {
+            System.err.println("날짜 파싱 실패: " + text);
+            return null;
         }
     }
 }

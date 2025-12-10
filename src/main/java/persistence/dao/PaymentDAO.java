@@ -64,6 +64,16 @@ public class PaymentDAO {
         return getPaymentList(sql, pstmt -> pstmt.setInt(1, restaurantId));
     }
 
+    // 식당 + 기간별 결제 내역 조회 (관리자용)
+    public List<PaymentDTO> findHistoryByRestaurantAndPeriod(int restaurantId, LocalDateTime startDate, LocalDateTime endDate) {
+        String sql = "SELECT * FROM payment WHERE restaurant_id = ? AND payment_time BETWEEN ? AND ? ORDER BY payment_time DESC";
+        return getPaymentList(sql, pstmt -> {
+            pstmt.setInt(1, restaurantId);
+            pstmt.setTimestamp(2, Timestamp.valueOf(startDate));
+            pstmt.setTimestamp(3, Timestamp.valueOf(endDate));
+        });
+    }
+
     // 기간별 결제 내역 조회 (관리자용)
     public List<PaymentDTO> findHistoryByPeriod(LocalDateTime startDate, LocalDateTime endDate) {
         String sql = "SELECT * FROM payment WHERE payment_time BETWEEN ? AND ? ORDER BY payment_time DESC";

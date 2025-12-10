@@ -43,6 +43,7 @@ public class MainService {
         if (response.getCode() == ProtocolCode.LOGIN_RESPONSE) {
             UserDTO user = (UserDTO) response.getData();
             OutputHandler.showSuccess(user.getLoginId() + " 로그인");
+            System.out.println(user.getUserType());
             return user.getUserType();   // "admin" / "student" / "other"
         }
 
