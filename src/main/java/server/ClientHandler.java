@@ -2,6 +2,7 @@ package server;
 
 import controller.MenuController;
 import controller.CouponController;
+import controller.PriceController;
 import java.io.*;
 import java.net.Socket;
 import network.Protocol; // Protocol 객체를 사용하여 통신 처리
@@ -13,6 +14,7 @@ public class ClientHandler extends Thread {
     private final Socket clientSocket;
     private final MenuController menuController = new MenuController();
     private final CouponController couponController = new CouponController();
+    private final PriceController priceController = new PriceController();
 
     // 생성자: 클라이언트 소켓을 받아서 초기화합니다.
     public ClientHandler(Socket socket) {
@@ -102,6 +104,18 @@ public class ClientHandler extends Thread {
                     return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
                 }
                 return couponController.upsertCouponPolicy((persistence.dto.CouponPolicyDTO) data);
+            }
+            case ProtocolCode.ADMIN_PRICE_REGISTER_REQUEST: {
+                Object data = receivedProtocol.getData();
+                if (!(data instanceof MenuPriceDTO)) {
+                    return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+                }
+                MenuPriceDTO menu = (MenuPriceDTO) data;
+                // menuPriceId가 있으면 단일 메뉴 변경(분식당), 없으면 식당 전체 일괄 변경(학생/교직원 식당)
+                if (menu.getMenuPriceId() > 0) {
+                    return priceController.upsertMenuPriceForSemester(menu);
+                }
+                return priceController.bulkUpdatePricesForSemester(menu);
             }
             default:
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
