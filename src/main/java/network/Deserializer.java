@@ -61,7 +61,7 @@ public class Deserializer {
     }
 
     public static Object makeObject(Class<?> c, byte[] objInfo, int idx) throws Exception {
-        // 기본 타입 처리
+        // [1] 기본 타입 처리 (Integer, Long 등) - 기존 코드 유지
         if (c == Integer.class) {
             byte[] arr = new byte[INT_LENGTH];
             System.arraycopy(objInfo, idx, arr, 0, INT_LENGTH);
@@ -90,6 +90,7 @@ public class Deserializer {
             System.arraycopy(objInfo, idx, strBytes, 0, len);
             return new String(strBytes);
         }
+        // [2] 최상위 객체가 byte[]인 경우 처리 (기존 코드 유지)
         if (c == byte[].class) {
             byte[] lenBytes = new byte[INT_LENGTH];
             System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
@@ -99,7 +100,7 @@ public class Deserializer {
             System.arraycopy(objInfo, idx, data, 0, len);
             return data;
         }
-        // List 복원
+        // [3] List, Map 처리 (기존 코드 유지)
         if (List.class.isAssignableFrom(c)) {
             List<Object> list = new ArrayList<>();
             byte[] lenBytes = new byte[INT_LENGTH];
@@ -115,8 +116,6 @@ public class Deserializer {
             }
             return list;
         }
-
-        // Map 복원
         if (Map.class.isAssignableFrom(c)) {
             Map<Object, Object> map = new HashMap<>();
             byte[] lenBytes = new byte[INT_LENGTH];
@@ -135,51 +134,64 @@ public class Deserializer {
                 byte[] valData = new byte[valLen];
                 System.arraycopy(objInfo, idx, valData, 0, valLen); idx += valLen;
                 Object val = getObject(valData);
-
                 map.put(key, val);
             }
             return map;
         }
 
+        // [4] DTO 필드 복원 (여기가 중요합니다!)
         Object result = c.getConstructor().newInstance();
         Field[] member = c.getDeclaredFields();
 
-        // 필드 정렬 (Serializer와 순서 일치 필수)
         Arrays.sort(member, Comparator.comparing(Field::getName));
 
         for (int i = 0; i < member.length; i++) {
             if (!Modifier.isStatic(member[i].getModifiers())) {
                 member[i].setAccessible(true);
 
-                // ▼▼▼ [수정 1] Null 체크 안전장치 추가 ▼▼▼
-                if (objInfo[idx++] == 0) { // 0이면 Null이라는 뜻
-                    // 객체 타입(String, Integer 등)만 null로 설정
-                    if (!member[i].getType().isPrimitive()) {
-                        member[i].set(result, null);
+                // Null Check 읽기
+                byte isNotNull = objInfo[idx++];
+
+                if (isNotNull == 0) {
+                    // ★ 중요: 기본형(int, double 등)은 null을 가질 수 없으므로 건너뜀 (오류 방지)
+                    if (member[i].getType().isPrimitive()) {
+                        continue;
                     }
-                    // 기본 타입(int, boolean)은 null 설정 불가능하므로 무시 (기본값 유지)
+                    member[i].set(result, null);
                     continue;
                 }
 
                 String typeStr = member[i].getType().toString();
+
                 if (typeStr.equals("int") || typeStr.contains("Integer")) {
                     byte[] arr = new byte[INT_LENGTH];
                     System.arraycopy(objInfo, idx, arr, 0, INT_LENGTH); idx += INT_LENGTH;
                     member[i].set(result, byteArrayToInt(arr));
-                } else if (typeStr.equals("long") || typeStr.contains("Long")) {
+                }
+                else if (typeStr.equals("long") || typeStr.contains("Long")) {
                     byte[] arr = new byte[LONG_LENGTH];
                     System.arraycopy(objInfo, idx, arr, 0, LONG_LENGTH); idx += LONG_LENGTH;
                     member[i].set(result, byteArrayToLong(arr));
-                } else if (typeStr.equals("double") || typeStr.contains("Double")) {
+                }
+                else if (typeStr.equals("double") || typeStr.contains("Double")) {
                     byte[] arr = new byte[DOUBLE_LENGTH];
                     System.arraycopy(objInfo, idx, arr, 0, DOUBLE_LENGTH); idx += DOUBLE_LENGTH;
                     member[i].set(result, byteArrayToDouble(arr));
-                } else if (typeStr.equals("boolean") || typeStr.contains("Boolean")) {
+                }
+                else if (typeStr.equals("boolean") || typeStr.contains("Boolean")) {
                     byte[] arr = new byte[1];
                     System.arraycopy(objInfo, idx, arr, 0, 1); idx += 1;
                     member[i].set(result, arr[0] != 0);
                 }
-                // ▼▼▼ [수정 2] DTO 내부의 byte[] (이미지) 필드 처리 로직 추가 (필수!) ▼▼▼
+                else if (typeStr.contains("String")) {
+                    byte[] lenBytes = new byte[INT_LENGTH];
+                    System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
+                    int len = byteArrayToInt(lenBytes);
+                    byte[] strBytes = new byte[len];
+                    System.arraycopy(objInfo, idx, strBytes, 0, len); idx += len;
+                    member[i].set(result, new String(strBytes));
+                }
+                // ★ [추가된 부분] byte[] 필드 (이미지 등) 처리 로직
                 else if (typeStr.contains("[B")) {
                     byte[] lenBytes = new byte[INT_LENGTH];
                     System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
@@ -189,14 +201,7 @@ public class Deserializer {
                     System.arraycopy(objInfo, idx, data, 0, len); idx += len;
                     member[i].set(result, data);
                 }
-                else if (typeStr.contains("String")) {
-                    byte[] lenBytes = new byte[INT_LENGTH];
-                    System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
-                    int len = byteArrayToInt(lenBytes);
-                    byte[] strBytes = new byte[len];
-                    System.arraycopy(objInfo, idx, strBytes, 0, len); idx += len;
-                    member[i].set(result, new String(strBytes));
-                } else if (typeStr.contains("LocalDateTime")) {
+                else if (typeStr.contains("LocalDateTime")) {
                     byte[] buf = new byte[INT_LENGTH];
                     System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int year = byteArrayToInt(buf);
                     System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int month = byteArrayToInt(buf);
@@ -204,8 +209,9 @@ public class Deserializer {
                     System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int hour = byteArrayToInt(buf);
                     System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int minute = byteArrayToInt(buf);
                     member[i].set(result, LocalDateTime.of(year, month, day, hour, minute));
-                } else {
-                    // DTO 필드 복원 (재귀)
+                }
+                else {
+                    // 그 외 객체는 재귀적으로 처리
                     byte[] lenBytes = new byte[INT_LENGTH];
                     System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
                     int len = byteArrayToInt(lenBytes);
