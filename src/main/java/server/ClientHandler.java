@@ -11,12 +11,15 @@ import java.util.Map;
 import network.Protocol;
 import network.ProtocolCode;
 import network.ProtocolType;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import persistence.dao.MenuPriceDAO;
 import persistence.dao.PaymentDAO;
 import persistence.dao.UserDAO;
 import persistence.dto.*;
 
 public class ClientHandler extends Thread {
+    private static final Log log = LogFactory.getLog(ClientHandler.class);
     private final Socket clientSocket;
 
     // 컨트롤러 및 DAO 초기화
@@ -111,15 +114,9 @@ public class ClientHandler extends Thread {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
         }
 
-        // 권한 체크 로직 (관리자 기능 접근 제어)
+        // [추가] 권한 체크 로직 (관리자 기능 접근 제어)
         // ProtocolCode 0x10 ~ 0x29 범위는 관리자 전용이라고 가정
         if (req.getCode() >= 0x10 && req.getCode() <= 0x29) {
-            System.out.println("[DEBUG] 권한 체크 시작. 요청 코드: 0x" + Integer.toHexString(req.getCode()));
-            if (this.loginUser == null) {
-                System.out.println("[DEBUG] loginUser가 NULL입니다! (로그인 처리가 안 됨)");
-            } else {
-                System.out.println("[DEBUG] 현재 유저: " + this.loginUser.getLoginId() + ", 타입: " + this.loginUser.getUserType());
-            }
             if (this.loginUser == null || !"admin".equals(this.loginUser.getUserType())) {
                 // 0x55: PERMISSION_DENIED 반환
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.PERMISSION_DENIED, "관리자 권한이 필요합니다.");
@@ -135,9 +132,11 @@ public class ClientHandler extends Thread {
                     UserDTO u = (UserDTO) req.getData();
                     UserDTO result = userDAO.findUserByLoginId(u.getLoginId(), u.getPassword());
                     if (result != null) {
-                        this.loginUser = result;
+                        // 성공 시 LOGIN_RESPONSE (0x30) + 유저 데이터 반환
+                        loginUser = result;
                         return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, result);
                     } else {
+                        // 실패 시 INVALID_INPUT (0x52) 반환
                         return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, null);
                     }
                 }
@@ -199,8 +198,11 @@ public class ClientHandler extends Thread {
                 // II. 관리자 - 메뉴/가격 관리
                 // ==========================================
                 case ProtocolCode.MENU_INSERT_REQUEST:       // 0x10
-                case ProtocolCode.MENU_UPDATE_REQUEST:       // 0x11
                     return menuController.registerOrUpdateMenu((MenuPriceDTO) req.getData());
+                case ProtocolCode.MENU_UPDATE_REQUEST:       // 0x11
+                {
+                    return menuController.registerOrUpdateMenu((MenuPriceDTO) req.getData());
+                }
 
                 case ProtocolCode.MENU_PHOTO_REGISTER_REQUEST: // 0x12
                     return menuController.uploadMenuImage((MenuPriceDTO) req.getData());

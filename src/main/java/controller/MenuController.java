@@ -34,11 +34,13 @@ public class MenuController {
      * menuPriceId가 0이하면 신규 등록, 그 이상이면 수정으로 처리.
      */
     public Protocol registerOrUpdateMenu(MenuPriceDTO menu) {
+        System.out.println("MenuController.registerOrUpdateMenu");
         if (!isValid(menu)) {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL,  null);
         }
 
         boolean success;
+        System.out.print(menu.getMenuPriceId());
         if (menu.getMenuPriceId() > 0) {
             if (!menupriceDAO.existsById(menu.getMenuPriceId())) {
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
