@@ -6,6 +6,8 @@ import persistence.dto.DTO;
 @Getter
 @Setter
 public class Protocol {
+    public static final int HEADER_SIZE = 6;
+
     private byte type;
     private byte code;
     private int dataLength;
@@ -26,6 +28,7 @@ public class Protocol {
         byte[] dataByteArray = new byte[0];
         if (data != null) {
             try {
+                // Serializer는 외부 구현에 의존
                 dataByteArray = Serializer.getBytes(data);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -47,7 +50,7 @@ public class Protocol {
     }
 
     private DTO byteArrayToData(byte type, byte code, byte[] arr) throws Exception {
-        if (type == ProtocolType.REQUEST) {
+        if (type == ProtocolType.REQUEST || type == ProtocolType.RESPONSE) {
             return (DTO) Deserializer.getObject(arr);
         }
 
@@ -56,19 +59,22 @@ public class Protocol {
         }
 
         else if (type == ProtocolType.RESULT) {
-            if (code == ProtocolCode.SUCCESS) {
-                return null;
-            }
-
-            else if (code == ProtocolCode.FAIL) {
+            if (code == ProtocolCode.SUCCESS ||
+                    code == ProtocolCode.FAIL ||
+                    code == ProtocolCode.INVALID_CREDENTIALS ||
+                    code == ProtocolCode.ACCESS_DENIED ||
+                    code == ProtocolCode.ADDITIONAL_FEE_REQUIRED ||
+                    code == ProtocolCode.SERVER_ERROR) {
                 return null;
             }
         }
 
         try {
-            throw new Exception("타입과 코드가 맞지 않음");
+            // 디버깅을 위해 16진수 코드도 함께 출력하도록 수정
+            String hexCode = Integer.toHexString(code & 0xFF).toUpperCase();
+            throw new Exception("타입과 코드가 맞지 않음. Type: " + type + ", Code: 0x" + hexCode);
         } catch (Exception e) {
-            System.out.println(type + " " + code);
+            System.out.println("Error Type: " + type + ", Code: 0x" + Integer.toHexString(code & 0xFF).toUpperCase());
             e.printStackTrace();
         }
 
@@ -87,7 +93,8 @@ public class Protocol {
         dataLength = Deserializer.byteArrayToInt(dataLengthByteArray);
 
         byte[] dataArray = new byte[dataLength];
-        System.arraycopy(arr, 2 + INT_LENGTH, dataArray, 0, dataLength); pos += dataLength;
+        // dataLength는 arr[2]부터 arr[5]에 있으므로, data는 arr[6]부터 시작합니다.
+        System.arraycopy(arr, HEADER_SIZE, dataArray, 0, dataLength); pos += dataLength;
         try {
             data = byteArrayToData(type, code, dataArray);
         }

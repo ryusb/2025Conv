@@ -14,6 +14,7 @@ public class ClientHandler extends Thread {
     private final MenuController menuController = new MenuController();
     private final CouponController couponController = new CouponController();
 
+
     // 생성자: 클라이언트 소켓을 받아서 초기화합니다.
     public ClientHandler(Socket socket) {
         this.clientSocket = socket;

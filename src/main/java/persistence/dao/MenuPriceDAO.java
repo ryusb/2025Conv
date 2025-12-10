@@ -116,18 +116,56 @@ public class MenuPriceDAO {
     }
 
     // 메뉴 이미지 경로 업데이트
-    public boolean updateMenuImagePath(int menuPriceId, String imagePath) {
+    public boolean updateMenuImagePath(int menuPriceId, byte[] imageBytes) {
+        // 컬럼명은 image_path지만, 실제로는 BLOB 데이터를 저장합니다.
         String sql = "UPDATE menu_price SET image_path = ? WHERE menu_price_id = ?";
-        try (Connection conn = DBConnectionManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, imagePath);
+
+        try (java.sql.Connection conn = network.DBConnectionManager.getConnection();
+             java.sql.PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            // setString 대신 setBytes 사용
+            pstmt.setBytes(1, imageBytes);
             pstmt.setInt(2, menuPriceId);
+
             int affectedRows = pstmt.executeUpdate();
             return affectedRows > 0;
-        } catch (SQLException e) {
-            System.err.println("RestaurantDAO - 메뉴 이미지 경로 업데이트 중 DB 오류: " + e.getMessage());
+        } catch (java.sql.SQLException e) {
+            System.err.println("MenuPriceDAO - 메뉴 이미지 DB 저장 중 오류: " + e.getMessage());
             return false;
         }
     }
 
+    public MenuPriceDTO findById(int menuPriceId) {
+        String sql = "SELECT * FROM menu_price WHERE menu_price_id = ?";
+        MenuPriceDTO menu = null;
+
+        try (java.sql.Connection conn = network.DBConnectionManager.getConnection();
+             java.sql.PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, menuPriceId);
+
+            try (java.sql.ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    menu = new MenuPriceDTO();
+                    menu.setMenuPriceId(rs.getInt("menu_price_id"));
+                    menu.setRestaurantId(rs.getInt("restaurant_id"));
+                    menu.setRestaurantName(rs.getString("restaurant_name"));
+                    menu.setSemesterName(rs.getString("semester_name"));
+                    menu.setCurrentSemester(rs.getBoolean("is_current_semester"));
+                    menu.setMealTime(rs.getString("meal_time"));
+                    menu.setMenuName(rs.getString("menu_name"));
+
+                    // [중요] DB의 BLOB 데이터를 DTO의 byte[] 필드에 매핑
+                    menu.setImageBytes(rs.getBytes("image_path"));
+
+                    menu.setPriceStu(rs.getInt("price_stu"));
+                    menu.setPriceFac(rs.getInt("price_fac"));
+                }
+            }
+        } catch (java.sql.SQLException e) {
+            System.err.println("MenuPriceDAO - 단건 조회 중 DB 오류: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return menu;
+    }
 }

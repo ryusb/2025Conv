@@ -99,8 +99,7 @@ public class Client {
                     System.arraycopy(body, 0, packet, 6, dataLength);
 
                     Protocol response = new Protocol(packet);
-                    System.out.println("⬅️ 응답 수신 완료. 코드: " + response.getCode());
-
+                    System.out.println("⬅️ 응답 수신 완료. 코드: 0x" + Integer.toHexString(response.getCode() & 0xFF).toUpperCase());
                     Object data = response.getData();
                     if (response.getCode() == ProtocolCode.LOGIN_RESPONSE) {
                         UserDTO user = (UserDTO) data;
