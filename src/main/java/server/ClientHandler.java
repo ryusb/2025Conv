@@ -71,11 +71,37 @@ public class ClientHandler extends Thread {
 
     // 데이터 수신 헬퍼 메서드
     private byte[] readProtocol(InputStream is) throws IOException {
-        // 충분한 버퍼 크기 할당 (이미지 업로드 등 대비)
-        byte[] buffer = new byte[1024 * 1024 * 2];
-        int read = is.read(buffer);
-        if (read == -1) throw new IOException("EOF");
-        return java.util.Arrays.copyOf(buffer, read);
+        byte[] header = new byte[Protocol.HEADER_SIZE];
+        int totalRead = 0;
+
+        while (totalRead < Protocol.HEADER_SIZE) {
+            int read = is.read(header, totalRead, Protocol.HEADER_SIZE - totalRead);
+            if (read == -1) {
+                throw new IOException("EOF"); // 클라이언트 연결 종료
+            }
+            totalRead += read;
+        }
+
+        // 2. 데이터 길이 파악 (헤더의 2~5번째 바이트가 길이 정보)
+        int dataLength = java.nio.ByteBuffer.wrap(header, 2, 4).getInt();
+
+        // 3. 데이터 본문(Body) 끝까지 읽기
+        byte[] body = new byte[dataLength];
+        totalRead = 0;
+        while (totalRead < dataLength) {
+            int read = is.read(body, totalRead, dataLength - totalRead);
+            if (read == -1) throw new IOException("EOF");
+            totalRead += read;
+        }
+
+        // 4. 전체 패킷 합치기 (Protocol 생성자에게 넘겨주기 위함)
+        byte[] packet = new byte[Protocol.HEADER_SIZE + dataLength];
+        System.arraycopy(header, 0, packet, 0, Protocol.HEADER_SIZE);
+        if (dataLength > 0) {
+            System.arraycopy(body, 0, packet, Protocol.HEADER_SIZE, dataLength);
+        }
+
+        return packet;
     }
 
     // 핵심 로직: 프로토콜 코드에 따른 분기 처리
