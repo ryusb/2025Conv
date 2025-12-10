@@ -115,23 +115,17 @@ public class MenuPriceDAO {
         }
     }
 
-    // 기존 메뉴 수정
+    // 기존 메뉴 수정 (메뉴명, 가격만 수정)
     public boolean updateMenu(MenuPriceDTO menu) {
-        String sql = "UPDATE menu_price SET restaurant_id = ?, restaurant_name = ?, semester_name = ?, is_current_semester = ?, " +
-                "meal_time = ?, menu_name = ?, price_stu = ?, price_fac = ? WHERE menu_price_id = ?";
+        String sql = "UPDATE menu_price SET menu_name = ?, price_stu = ?, price_fac = ? WHERE menu_price_id = ?";
 
         try (Connection conn = DBConnectionManager.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            pstmt.setInt(1, menu.getRestaurantId());
-            pstmt.setString(2, menu.getRestaurantName());
-            pstmt.setString(3, menu.getSemesterName());
-            pstmt.setBoolean(4, menu.isCurrentSemester());
-            pstmt.setString(5, menu.getMealTime());
-            pstmt.setString(6, menu.getMenuName());
-            pstmt.setInt(7, menu.getPriceStu());
-            pstmt.setInt(8, menu.getPriceFac());
-            pstmt.setInt(9, menu.getMenuPriceId());
+            pstmt.setString(1, menu.getMenuName());
+            pstmt.setInt(2, menu.getPriceStu());
+            pstmt.setInt(3, menu.getPriceFac());
+            pstmt.setInt(4, menu.getMenuPriceId());
 
             int affectedRows = pstmt.executeUpdate();
             return affectedRows > 0;

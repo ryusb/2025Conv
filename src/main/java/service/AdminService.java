@@ -109,7 +109,7 @@ public class AdminService {
         }
 
         String menuDate = InputHandler.getString("메뉴 날짜 (YYYY-MM-DD, 옵션)");
-        String mealTime = InputHandler.getString("식사 시간대 (아침/점심/저녁/상시)");
+        // String mealTime = InputHandler.getString("식사 시간대 (아침/점심/저녁/상시)");
 
         // 1) 메뉴 목록 요청
         Map<String, Object> listReq = new HashMap<>();
@@ -132,9 +132,21 @@ public class AdminService {
 
         OutputHandler.showMessage("수정 대상 선택 (menu_price_id: menu_name):");
         for (MenuPriceDTO m : menus) {
-            System.out.println(m.getMenuPriceId() + " : " + m.getMenuName());
+            System.out.println(m.getMenuPriceId() + " : " + m.getMenuName() + " (" + m.getPriceStu() + "원 / " + m.getPriceFac() + "원)");
         }
 
+        // 2) 수정할 정보 입력 (메뉴명, 가격만 입력받음)
+        int targetId = InputHandler.getInt("수정할 menu_price_id");
+        String newMenuName = InputHandler.getString("새 메뉴 이름");
+        int priceStu = InputHandler.getInt("학생가");
+        int priceFac = InputHandler.getInt("교직원가");
+
+        MenuPriceDTO dto = new MenuPriceDTO();
+        dto.setMenuPriceId(targetId);
+        dto.setMenuName(newMenuName);
+        dto.setPriceStu(priceStu);
+        dto.setPriceFac(priceFac);
+        /*
         int targetId = InputHandler.getInt("수정할 menu_price_id");
         String newMenuName = InputHandler.getString("새 메뉴 이름");
         String semesterName = InputHandler.getString("학기명 (예: 2025-1)");
@@ -154,7 +166,7 @@ public class AdminService {
         dto.setMenuDate(menuDate);
         dto.setPriceStu(priceStu);
         dto.setPriceFac(priceFac);
-
+        */
         Protocol updateRequest = new Protocol(ProtocolType.REQUEST, ProtocolCode.MENU_UPDATE_REQUEST, 0, dto);
         Protocol updateResponse = sendRequest(updateRequest);
         if (updateResponse != null && updateResponse.getCode() == ProtocolCode.SUCCESS) {

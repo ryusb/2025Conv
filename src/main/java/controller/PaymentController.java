@@ -42,27 +42,26 @@ public class PaymentController {
         // 2. 사용자 타입에 따른 가격 결정
         int currentPrice = request.getUserType().equals("교직원") ? menu.getPriceFac() : menu.getPriceStu();
 
-        int payAmount = 0;
         int couponValue = 0;
         int additionalCost = 0;
 
         // 3. 쿠폰 사용 여부 확인
         if (request.getUsedCouponId() != null && request.getUsedCouponId() > 0) {
             CouponDTO coupon = couponDAO.findById(request.getUsedCouponId());
-
             if (coupon == null || coupon.isUsed()) {
-                // 유효하지 않은 쿠폰
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "유효하지 않은 쿠폰");
             }
-
+            if (coupon.getUserId() != request.getUserId()) {
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "본인의 쿠폰만 사용할 수 있습니다.");
+            }
             couponValue = coupon.getPurchaseValue(); // 구매 당시 쿠폰 가치
 
-            // 핵심 로직: 가격 인상으로 인한 차액 계산
             if (currentPrice > couponValue) {
                 additionalCost = currentPrice - couponValue;
             }
 
             // 쿠폰 사용 처리
+            // 원래는 결제 트랜잭션 완료 시점에 업데이트하는 것이 더 안전하지만, 현재 구조상 여기서 처리합니다.
             couponDAO.updateCouponToUsed(coupon.getCouponId());
         } else {
             // 카드 결제 (전액)

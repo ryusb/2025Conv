@@ -170,7 +170,9 @@ public class TestClient {
         if (res.getCode() == ProtocolCode.COUPON_LIST_RESPONSE) {
             List<CouponDTO> list = (List<CouponDTO>) res.getData();
             System.out.println("🎟️ 보유 쿠폰 (" + list.size() + "장):");
-            for(CouponDTO c : list) System.out.println("- " + c.getPurchaseValue() + "원권 (" + c.getPurchaseDate() + ")");
+            for(CouponDTO c : list) {
+                System.out.printf("- ID:%d, 가액:%d원, 구매일:%s\n", c.getCouponId(), c.getPurchaseValue(), c.getPurchaseDate());
+            }
         } else printFail(res);
     }
 
@@ -197,7 +199,7 @@ public class TestClient {
         pay.setMenuPriceId(getIntInput());
 
         if (code == ProtocolCode.PAYMENT_COUPON_REQUEST) {
-            System.out.print("사용할 쿠폰 ID: ");
+            System.out.print("사용할 쿠폰 ID (본인 소유): ");
             pay.setUsedCouponId(getIntInput());
         }
 
@@ -240,17 +242,20 @@ public class TestClient {
     // 0x11: 메뉴 수정
     private static void testMenuUpdate() throws IOException {
         System.out.println("\n[관리자: 메뉴 수정]");
+        System.out.println("※ 주의: 수정할 메뉴의 ID를 정확히 입력해야 합니다.");
+
         MenuPriceDTO m = new MenuPriceDTO();
-        System.out.print("수정할 메뉴 ID: "); m.setMenuPriceId(getIntInput());
-        // 필수 정보 입력 (생략 시 에러 날 수 있으므로 입력)
-        System.out.print("식당 ID: "); m.setRestaurantId(getIntInput());
-        System.out.print("식당 이름: "); m.setRestaurantName(sc.nextLine());
-        System.out.print("새 메뉴명: "); m.setMenuName(sc.nextLine());
-        System.out.print("시간대: "); m.setMealTime(sc.nextLine());
-        System.out.print("학기명: "); m.setSemesterName(sc.nextLine());
-        m.setCurrentSemester(true);
-        System.out.print("학생가: "); m.setPriceStu(getIntInput());
-        System.out.print("교직원가: "); m.setPriceFac(getIntInput());
+        System.out.print("수정할 메뉴 ID: ");
+        m.setMenuPriceId(getIntInput());
+
+        System.out.print("새 메뉴명: ");
+        m.setMenuName(sc.nextLine());
+
+        System.out.print("새 학생가: ");
+        m.setPriceStu(getIntInput());
+
+        System.out.print("새 교직원가: ");
+        m.setPriceFac(getIntInput());
 
         send(new Protocol(ProtocolType.REQUEST, ProtocolCode.MENU_UPDATE_REQUEST, m));
         printSimpleResult(receive());
@@ -452,12 +457,6 @@ public class TestClient {
             System.out.println("❌ 실패 (FAIL): " + res.getData());
         } else if (res.getCode() == ProtocolCode.PERMISSION_DENIED) {
             System.out.println("⛔ 권한 없음 (PERMISSION_DENIED)");
-            System.out.println("--[DEBUG] 권한 체크 시작. 요청 코드: 0x" + Integer.toHexString(res.getCode()));
-            if (currentUser == null) {
-                System.out.println("--[DEBUG] loginUser가 NULL입니다! (로그인 처리가 안 됨)");
-            } else {
-                System.out.println("--[DEBUG] 현재 유저: " + currentUser.getLoginId() + ", 타입: " + currentUser.getUserType());
-            }
         } else {
             System.out.println("⚠️ 기타 응답 코드: 0x" + Integer.toHexString(res.getCode()));
         }
