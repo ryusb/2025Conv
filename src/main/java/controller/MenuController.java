@@ -26,6 +26,10 @@ public class MenuController {
         return menupriceDAO.findCurrentMenus(restaurantId, mealTime);
     }
 
+    public List<MenuPriceDTO> getMenusByRestaurantAndDate(int restaurantId, String menuDate) {
+        return menupriceDAO.findMenusByRestaurantAndDate(restaurantId, menuDate);
+    }
+
     /**
      * menuPriceId가 0이하면 신규 등록, 그 이상이면 수정으로 처리.
      */

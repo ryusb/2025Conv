@@ -43,27 +43,7 @@ public class RestaurantDAO {
         return restaurantList;
     }
 
-    // 식당 이름으로 식당 ID를 조회 (결제 처리에 필요)
-    public static int findRestaurantIdByName(String name) {
-        String sql = "SELECT restaurant_id FROM restaurant WHERE name = ?";
-        int id = -1;
-
-        try (Connection conn = DBConnectionManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-
-            pstmt.setString(1, name);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    id = rs.getInt("restaurant_id");
-                }
-            }
-        } catch (SQLException e) {
-            System.err.println("RestaurantDAO - ID 조회 중 DB 오류: " + e.getMessage());
-        }
-        return id;
-    }
-
-    public static RestaurantDTO findById(int restaurantId) {
+    public RestaurantDTO findById(int restaurantId) {
         String sql = "SELECT * FROM restaurant WHERE restaurant_id = ?";
         RestaurantDTO restaurant = null;
 
