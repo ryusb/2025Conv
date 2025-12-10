@@ -66,9 +66,9 @@ public class UserService {
             printMenu(USER_ORDER_MENU);
 
             switch (InputHandler.getInt("입력")) {
-                case 1 -> OrderService.order("facCafeteria");
-                case 2 -> OrderService.order("stdCafeteria");
-                case 3 -> OrderService.order("snack");
+                case 1 -> OrderService.order();
+                case 2 -> OrderService.order();
+                case 3 -> OrderService.order();
                 case 4 -> isRunning = false;
                 default -> OutputHandler.showError("잘못된 선택입니다");
             }

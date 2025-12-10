@@ -26,19 +26,35 @@ public class OrderService {
     /* --------------------------------------------------------
      * 1. 메뉴 목록 조회
      * -------------------------------------------------------- */
-    public static void order(String restaurant) {
-        MenuPriceDTO dto = new MenuPriceDTO();
-        int id = RestaurantDAO.findRestaurantIdByName(restaurant);
-        dto.setRestaurantName(restaurant);
-        dto.setRestaurantId(id);
-
-        RestaurantDTO rest = RestaurantDAO.findById(id);
-        if (rest == null) {
-            OutputHandler.showError("식당 정보를 가져오지 못했습니다.");
+    public static void order() {
+        // 1. 전체 식당 목록 조회
+        RestaurantDAO restaurantDAO = new RestaurantDAO();
+        List<RestaurantDTO> restaurants = restaurantDAO.findAllRestaurants();
+        if (restaurants == null || restaurants.isEmpty()) {
+            OutputHandler.showError("식당 정보가 없습니다.");
             return;
         }
 
-        String mealTime = TimeSlotUtil.getCurrentOrNearestMealTime(rest);
+        // 2. 사용자에게 식당 선택하도록 안내
+        OutputHandler.showTitle("식당 목록");
+        for (int i = 0; i < restaurants.size(); i++) {
+            RestaurantDTO r = restaurants.get(i);
+            System.out.println((i + 1) + ". " + r.getName());
+        }
+
+        int choice = InputHandler.getInt("식당 번호 선택");
+        if (choice < 1 || choice > restaurants.size()) {
+            OutputHandler.showError("잘못된 선택입니다.");
+            return;
+        }
+
+        RestaurantDTO selectedRestaurant = restaurants.get(choice - 1);
+
+        // 3. 메뉴 목록 조회
+        String mealTime = TimeSlotUtil.getCurrentOrNearestMealTime(selectedRestaurant);
+        MenuPriceDTO dto = new MenuPriceDTO();
+        dto.setRestaurantId(selectedRestaurant.getRestaurantId());
+        dto.setRestaurantName(selectedRestaurant.getName());
         dto.setMealTime(mealTime);
 
         Protocol response = NetworkClient.sendRequest(
@@ -58,28 +74,21 @@ public class OrderService {
             return;
         }
 
-        // 안전하게 role 가져오기, null이면 "student"로 기본
+        // 4. 메뉴 출력 및 주문/이미지 선택
         String role = UserSession.getRole();
         if (role == null) role = "student";
 
         OutputHandler.showTitle("메뉴 목록");
-
         for (int i = 0; i < menus.size(); i++) {
             MenuPriceDTO m = menus.get(i);
-            if (m == null) continue;
-
             int appliedPrice = "student".equals(role) ? m.getPriceStu() : m.getPriceFac();
-
-            System.out.println((i + 1) + ". " + m.getMenuName()
-                    + " - " + appliedPrice + "원");
+            System.out.println((i + 1) + ". " + m.getMenuName() + " - " + appliedPrice + "원");
         }
 
-        // 이후 메뉴 상세 or 이미지 선택
         boolean loop = true;
         while (loop) {
-            int choice = InputHandler.getInt("입력");
-
-            switch (choice) {
+            int action = InputHandler.getInt("1:주문 2:이미지 다운로드 3:뒤로");
+            switch (action) {
                 case 1 -> loop = orderByMenu(menus);
                 case 2 -> imageDownload();
                 case 3 -> loop = false;
@@ -87,6 +96,7 @@ public class OrderService {
             }
         }
     }
+
 
     /* --------------------------------------------------------
      * 2. 메뉴 상세 조회 및 주문
@@ -117,37 +127,65 @@ public class OrderService {
         char ans = InputHandler.getChar("입력");
         if (ans == 'N' || ans == 'n') return true;
 
-        // 결제 정보 구성
-        PaymentDTO dto = new PaymentDTO();
-        dto.setUserId(userId);
-        dto.setMenuPriceId(menu.getMenuPriceId());
-        dto.setMenuName(menu.getMenuName());
-        dto.setMenuPriceAtTime(appliedPrice);
-        dto.setRestaurantId(menu.getRestaurantId());
-        dto.setRestaurantName(menu.getRestaurantName());
-        dto.setUserType(role);
+        // 공통 DTO 준비
+        PaymentDTO baseDto = new PaymentDTO();
+        baseDto.setUserId(userId);
+        baseDto.setMenuPriceId(menu.getMenuPriceId());
+        baseDto.setMenuName(menu.getMenuName());
+        baseDto.setMenuPriceAtTime(appliedPrice);
+        baseDto.setRestaurantId(menu.getRestaurantId());
+        baseDto.setRestaurantName(menu.getRestaurantName());
+        baseDto.setUserType(role);
 
-        // 쿠폰 결제
+        // 1. 쿠폰 결제 (선택)
         char couponAns = InputHandler.getChar("쿠폰 사용? (Y/N)");
         if (couponAns == 'Y' || couponAns == 'y') {
+            int couponId = InputHandler.getInt("사용할 쿠폰 ID");
+
+            PaymentDTO couponDto = new PaymentDTO();
+            couponDto.setUserId(baseDto.getUserId());
+            couponDto.setMenuPriceId(baseDto.getMenuPriceId());
+            couponDto.setMenuName(baseDto.getMenuName());
+            couponDto.setMenuPriceAtTime(baseDto.getMenuPriceAtTime());
+            couponDto.setRestaurantId(baseDto.getRestaurantId());
+            couponDto.setRestaurantName(baseDto.getRestaurantName());
+            couponDto.setUserType(baseDto.getUserType());
+            couponDto.setUsedCouponId(couponId);
+
             Protocol res = NetworkClient.sendRequest(
                     ProtocolCode.PAYMENT_COUPON_REQUEST,
-                    dto
+                    couponDto
             );
-            if (res == null || res.getCode() != ProtocolCode.SUCCESS) {
+
+            if (res != null && res.getCode() == ProtocolCode.SUCCESS) {
+                OutputHandler.showSuccess("쿠폰 결제 완료");
+            } else {
                 OutputHandler.showError("쿠폰 결제 실패");
             }
         }
 
-        // 카드 결제
-        Protocol cardRes = NetworkClient.sendRequest(
-                ProtocolCode.PAYMENT_CARD_REQUEST,
-                dto
-        );
-        if (cardRes != null && cardRes.getCode() == ProtocolCode.SUCCESS) {
-            OutputHandler.showSuccess("결제 완료");
-        } else {
-            OutputHandler.showError("카드 결제 실패");
+        // 2. 카드 결제 (남은 결제)
+        char cardAns = InputHandler.getChar("카드로 추가 결제? (Y/N)");
+        if (cardAns == 'Y' || cardAns == 'y') {
+            PaymentDTO cardDto = new PaymentDTO();
+            cardDto.setUserId(baseDto.getUserId());
+            cardDto.setMenuPriceId(baseDto.getMenuPriceId());
+            cardDto.setMenuName(baseDto.getMenuName());
+            cardDto.setMenuPriceAtTime(baseDto.getMenuPriceAtTime());
+            cardDto.setRestaurantId(baseDto.getRestaurantId());
+            cardDto.setRestaurantName(baseDto.getRestaurantName());
+            cardDto.setUserType(baseDto.getUserType());
+
+            Protocol cardRes = NetworkClient.sendRequest(
+                    ProtocolCode.PAYMENT_CARD_REQUEST,
+                    cardDto
+            );
+
+            if (cardRes != null && cardRes.getCode() == ProtocolCode.SUCCESS) {
+                OutputHandler.showSuccess("카드 결제 완료");
+            } else {
+                OutputHandler.showError("카드 결제 실패");
+            }
         }
 
         return true;
