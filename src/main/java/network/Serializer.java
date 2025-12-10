@@ -53,32 +53,28 @@ public class Serializer {
 
 
     public static byte[] makeBody(Object obj) throws Exception {
-        // [추가] List 타입인 경우 (필드가 아니라 객체 자체가 List일 때)
+        // List 처리 (필드가 아니라 객체 자체가 List일 때)
         if (obj instanceof List) {
             List<?> list = (List<?>) obj;
             ArrayList<Byte> result = new ArrayList<>();
-            // 리스트 크기 먼저 저장
             addArrList(result, intToByteArray(list.size()));
-            // 각 요소 직렬화 (재귀 호출)
             for (Object element : list) {
-                byte[] elementBytes = getBytes(element); // 각 요소를 통째로 직렬화 (헤더 포함)
-                addArrList(result, intToByteArray(elementBytes.length)); // 요소 길이
-                addArrList(result, elementBytes); // 요소 데이터
+                byte[] elementBytes = getBytes(element);
+                addArrList(result, intToByteArray(elementBytes.length));
+                addArrList(result, elementBytes);
             }
             return byteListToArray(result);
         }
 
-        // [추가] Map 타입인 경우
+        // Map 처리
         if (obj instanceof Map) {
             Map<?, ?> map = (Map<?, ?>) obj;
             ArrayList<Byte> result = new ArrayList<>();
             addArrList(result, intToByteArray(map.size()));
             for (Map.Entry<?, ?> entry : map.entrySet()) {
-                // Key 직렬화
                 byte[] keyBytes = getBytes(entry.getKey());
                 addArrList(result, intToByteArray(keyBytes.length));
                 addArrList(result, keyBytes);
-                // Value 직렬화
                 byte[] valBytes = getBytes(entry.getValue());
                 addArrList(result, intToByteArray(valBytes.length));
                 addArrList(result, valBytes);
@@ -86,56 +82,58 @@ public class Serializer {
             return byteListToArray(result);
         }
 
+        // 기본 타입 처리
+        if (obj instanceof Integer) {
+            return intToByteArray((Integer) obj);
+        }
+        if (obj instanceof Long) {
+            return longToByteArray((Long) obj);
+        }
+        if (obj instanceof Double) {
+            return doubleToByteArray((Double) obj);
+        }
+        if (obj instanceof String) {
+            return stringToByteArray((String) obj);
+        }
+        if (obj instanceof LocalDate) {
+            return localDateToByteArray((LocalDate) obj);
+        }
+        if (obj instanceof LocalDateTime) {
+            return dateToByteArray((LocalDateTime) obj);
+        }
+
         Class<?> c = obj.getClass();
         Field[] member = c.getDeclaredFields();
         ArrayList<Byte> result = new ArrayList<>();
-
         byte[] arr = new byte[0];
-        Class<?> type;
-        Object memberVal;
-        String typeStr;
 
         for (Field field : member) {
             if (!Modifier.isStatic(field.getModifiers())) {
                 field.setAccessible(true);
-                type = field.getType();
-                memberVal = field.get(obj);
-                if (memberVal == null) {    // 직렬화 첫 비트는 null 확인용 비트
+                Object memberVal = field.get(obj);
+
+                if (memberVal == null) {
                     addArrList(result, new byte[]{0});
                 } else {
-                    typeStr = type.toString();
-                    if (typeStr.equals("int")) {
+                    addArrList(result, new byte[]{1});
+                    String typeStr = field.getType().toString();
+
+                    if (typeStr.equals("int") || typeStr.contains("Integer")) {
                         arr = intToByteArray((int) memberVal);
-                    } else if (typeStr.equals("long")) {
+                    } else if (typeStr.equals("long") || typeStr.contains("Long")) {
                         arr = longToByteArray((long) memberVal);
-                    } else if (typeStr.contains("Integer")) {
-                        arr = intToByteArray((Integer) memberVal);
-                    } else if (typeStr.contains("Long")) {
-                        arr = longToByteArray((Long) memberVal);
+                    } else if (typeStr.equals("double") || typeStr.contains("Double")) {
+                        arr = doubleToByteArray((double) memberVal);
                     } else if (typeStr.contains("String")) {
                         arr = stringToByteArray((String) memberVal);
-                    } else if (typeStr.contains("LocalDate") && !typeStr.contains("LocalDateTime")) {
-                        arr = localDateToByteArray((LocalDate) memberVal);
                     } else if (typeStr.contains("LocalDateTime")) {
                         arr = dateToByteArray((LocalDateTime) memberVal);
-                    } else if (typeStr.equals("double")) {
-                        arr = doubleToByteArray((double) memberVal);
-                    } else if (typeStr.contains("Double"))
-                    {
-                        arr = doubleToByteArray((Double) memberVal);
+                    } else {
+                        // DTO 내부의 객체 필드 (재귀 직렬화)
+                        arr = getBytes(memberVal);
+                        byte[] len = intToByteArray(arr.length);
+                        addArrList(result, len);
                     }
-                    else if (typeStr.equals("class [B") || typeStr.contains("byte[]")) {
-                        byte[] byteArray = (byte[]) memberVal;
-
-                        addArrList(result, new byte[]{1});
-
-                        byte[] lengthBytes = intToByteArray(byteArray.length);
-                        addArrList(result, lengthBytes);
-
-                        addArrList(result, byteArray);
-                        continue;
-                    }
-                    addArrList(result, new byte[]{1});
                     addArrList(result, arr);
                 }
             }
