@@ -9,7 +9,6 @@ import java.util.Scanner;
 import network.*;
 import persistence.dto.PaymentDTO;
 import persistence.dto.UserDTO;
-import service.AdminService;
 
 public class Client {
     // ⚠️ TODO: 데스크톱의 실제 IP 주소를 여기에 입력하세요.
@@ -28,7 +27,7 @@ public class Client {
 
             while (true) {
                 System.out.println("\n=== [테스트 메뉴] ===");
-                System.out.println("1. 관리자 페이지 (로컬 실행)");
+                System.out.println("1. 로그인 요청");
                 System.out.println("2. 개인 이용 내역 조회 (로그인 가정)");
                 System.out.println("3. 식당별 매출 현황 조회 (관리자)");
                 System.out.println("4. 종료");
