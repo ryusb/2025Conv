@@ -42,7 +42,6 @@ public class MenuPriceDAO {
     }
     // 메뉴 신규 등록
     public boolean insertMenu(MenuPriceDTO menu) {
-        // [수정] date 컬럼 추가
         String sql = "INSERT INTO menu_price (restaurant_id, restaurant_name, semester_name, is_current_semester, meal_time, menu_name, price_stu, price_fac, date) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -100,7 +99,7 @@ public class MenuPriceDAO {
             int affectedRows = pstmt.executeUpdate();
             return affectedRows > 0;
         } catch (SQLException e) {
-            System.err.println("RestaurantDAO - 메뉴 수정 중 DB 오류: " + e.getMessage());
+            System.err.println("MenuPriceDAO - 메뉴 수정 중 DB 오류: " + e.getMessage());
             return false;
         }
     }
@@ -115,7 +114,7 @@ public class MenuPriceDAO {
                 return rs.next();
             }
         } catch (SQLException e) {
-            System.err.println("RestaurantDAO - 메뉴 존재 여부 확인 중 DB 오류: " + e.getMessage());
+            System.err.println("MenuPriceDAO - 메뉴 존재 여부 확인 중 DB 오류: " + e.getMessage());
             return false;
         }
     }
@@ -134,8 +133,44 @@ public class MenuPriceDAO {
 
             int affectedRows = pstmt.executeUpdate();
             return affectedRows > 0;
-        } catch (java.sql.SQLException e) {
-            System.err.println("MenuPriceDAO - 메뉴 이미지 DB 저장 중 오류: " + e.getMessage());
+        } catch (SQLException e) {
+            System.err.println("MenuPriceDAO - 메뉴 이미지 경로 업데이트 중 DB 오류: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // 단일 메뉴의 학기/가격 수정
+    public boolean updateMenuPriceAndSemester(MenuPriceDTO menu) {
+        String sql = "UPDATE menu_price SET semester_name = ?, is_current_semester = ?, price_stu = ?, price_fac = ? WHERE menu_price_id = ?";
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, menu.getSemesterName());
+            pstmt.setBoolean(2, menu.isCurrentSemester());
+            pstmt.setInt(3, menu.getPriceStu());
+            pstmt.setInt(4, menu.getPriceFac());
+            pstmt.setInt(5, menu.getMenuPriceId());
+            int affectedRows = pstmt.executeUpdate();
+            return affectedRows > 0;
+        } catch (SQLException e) {
+            System.err.println("MenuPriceDAO - 메뉴 가격/학기 수정 중 DB 오류: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // 특정 식당, 특정 학기에 대해 모든 메뉴 가격 일괄 수정
+    public boolean bulkUpdateSemesterPrices(int restaurantId, String semesterName, boolean isCurrentSemester, int priceStu, int priceFac) {
+        String sql = "UPDATE menu_price SET is_current_semester = ?, price_stu = ?, price_fac = ? WHERE restaurant_id = ? AND semester_name = ?";
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setBoolean(1, isCurrentSemester);
+            pstmt.setInt(2, priceStu);
+            pstmt.setInt(3, priceFac);
+            pstmt.setInt(4, restaurantId);
+            pstmt.setString(5, semesterName);
+            int affectedRows = pstmt.executeUpdate();
+            return affectedRows > 0;
+        } catch (SQLException e) {
+            System.err.println("MenuPriceDAO - 식당 전체 메뉴 일괄 가격 수정 중 DB 오류: " + e.getMessage());
             return false;
         }
     }

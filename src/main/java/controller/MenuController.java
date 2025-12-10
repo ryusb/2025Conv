@@ -4,7 +4,6 @@ import network.Protocol;
 import network.ProtocolCode;
 import network.ProtocolType;
 import persistence.dao.MenuPriceDAO;
-import persistence.dao.RestaurantDAO;
 import persistence.dto.MenuPriceDTO;
 
 import java.io.IOException;

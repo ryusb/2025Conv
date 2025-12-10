@@ -50,8 +50,9 @@ public class Protocol {
     }
 
     private DTO byteArrayToData(byte type, byte code, byte[] arr) throws Exception {
-        if (type == ProtocolType.REQUEST) {
-            return (DTO) Deserializer.getObject(arr);
+        // RESULT 타입은 데이터 없이 상태 코드만 내려온다고 가정한다.
+        if (type == ProtocolType.RESULT) {
+            return null;
         }
 
         else if (type == ProtocolType.RESPONSE) {
