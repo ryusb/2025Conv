@@ -2,7 +2,12 @@ package network;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class Deserializer {
     final static String UID_FIELD_NAME = "serialVersionUID";
@@ -61,6 +66,52 @@ public class Deserializer {
 
 
     public static Object makeObject(Class<?> c, byte[] objInfo, int idx) throws Exception {
+        // [추가] List 복원
+        if (List.class.isAssignableFrom(c)) {
+            List<Object> list = new ArrayList<>();
+            byte[] lenBytes = new byte[INT_LENGTH];
+            System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
+            int size = byteArrayToInt(lenBytes);
+
+            for (int i = 0; i < size; i++) {
+                // 요소 길이 읽기
+                System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
+                int elemLen = byteArrayToInt(lenBytes);
+                // 요소 데이터 읽어서 객체로 복원
+                byte[] elemData = new byte[elemLen];
+                System.arraycopy(objInfo, idx, elemData, 0, elemLen); idx += elemLen;
+                list.add(getObject(elemData));
+            }
+            return list;
+        }
+
+        // [추가] Map 복원
+        if (Map.class.isAssignableFrom(c)) {
+            Map<Object, Object> map = new HashMap<>();
+            byte[] lenBytes = new byte[INT_LENGTH];
+            System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
+            int size = byteArrayToInt(lenBytes);
+
+            for (int i = 0; i < size; i++) {
+                // Key
+                System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
+                int keyLen = byteArrayToInt(lenBytes);
+                byte[] keyData = new byte[keyLen];
+                System.arraycopy(objInfo, idx, keyData, 0, keyLen); idx += keyLen;
+                Object key = getObject(keyData);
+
+                // Value
+                System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
+                int valLen = byteArrayToInt(lenBytes);
+                byte[] valData = new byte[valLen];
+                System.arraycopy(objInfo, idx, valData, 0, valLen); idx += valLen;
+                Object val = getObject(valData);
+
+                map.put(key, val);
+            }
+            return map;
+        }
+
         Object result = c.getConstructor().newInstance();
         Field[] member = c.getDeclaredFields();
 
@@ -106,6 +157,13 @@ public class Deserializer {
                         System.arraycopy(objInfo, idx, arr, 0, length);
                         idx += length;
                         member[i].set(result, new String(arr));
+                    }
+                    else if (typeStr.contains("LocalDate") && !typeStr.contains("LocalDateTime")) {
+                        byte[] buf = new byte[INT_LENGTH];
+                        System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int year = byteArrayToInt(buf);
+                        System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int month = byteArrayToInt(buf);
+                        System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int day = byteArrayToInt(buf);
+                        member[i].set(result, LocalDate.of(year, month, day));
                     }
                     else if (typeStr.contains("LocalDateTime")) {
                         byte[] yearByteArray = new byte[INT_LENGTH];

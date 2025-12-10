@@ -2,8 +2,11 @@ package network;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class Serializer {
     final static String UID_FIELD_NAME = "serialVersionUID";
@@ -50,6 +53,39 @@ public class Serializer {
 
 
     public static byte[] makeBody(Object obj) throws Exception {
+        // [추가] List 타입인 경우 (필드가 아니라 객체 자체가 List일 때)
+        if (obj instanceof List) {
+            List<?> list = (List<?>) obj;
+            ArrayList<Byte> result = new ArrayList<>();
+            // 리스트 크기 먼저 저장
+            addArrList(result, intToByteArray(list.size()));
+            // 각 요소 직렬화 (재귀 호출)
+            for (Object element : list) {
+                byte[] elementBytes = getBytes(element); // 각 요소를 통째로 직렬화 (헤더 포함)
+                addArrList(result, intToByteArray(elementBytes.length)); // 요소 길이
+                addArrList(result, elementBytes); // 요소 데이터
+            }
+            return byteListToArray(result);
+        }
+
+        // [추가] Map 타입인 경우
+        if (obj instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) obj;
+            ArrayList<Byte> result = new ArrayList<>();
+            addArrList(result, intToByteArray(map.size()));
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                // Key 직렬화
+                byte[] keyBytes = getBytes(entry.getKey());
+                addArrList(result, intToByteArray(keyBytes.length));
+                addArrList(result, keyBytes);
+                // Value 직렬화
+                byte[] valBytes = getBytes(entry.getValue());
+                addArrList(result, intToByteArray(valBytes.length));
+                addArrList(result, valBytes);
+            }
+            return byteListToArray(result);
+        }
+
         Class<?> c = obj.getClass();
         Field[] member = c.getDeclaredFields();
         ArrayList<Byte> result = new ArrayList<>();
@@ -78,6 +114,8 @@ public class Serializer {
                         arr = longToByteArray((Long) memberVal);
                     } else if (typeStr.contains("String")) {
                         arr = stringToByteArray((String) memberVal);
+                    } else if (typeStr.contains("LocalDate") && !typeStr.contains("LocalDateTime")) {
+                        arr = localDateToByteArray((LocalDate) memberVal);
                     } else if (typeStr.contains("LocalDateTime")) {
                         arr = dateToByteArray((LocalDateTime) memberVal);
                     } else if (typeStr.equals("double")) {
@@ -141,8 +179,6 @@ public class Serializer {
         };
     }
 
-
-
     public static byte[] stringToByteArray(String str) {
         ArrayList<Byte> result = new ArrayList<>();
         byte[] arr = str.getBytes();
@@ -153,6 +189,18 @@ public class Serializer {
         addArrList(result, lengthByteArray);
         addArrList(result, arr);
         return byteListToArray(result);
+    }
+
+    public static byte[] localDateToByteArray(LocalDate val) {
+        byte[] year = intToByteArray(val.getYear());
+        byte[] month = intToByteArray(val.getMonthValue());
+        byte[] day = intToByteArray(val.getDayOfMonth());
+
+        byte[] result = new byte[12];
+        System.arraycopy(year, 0, result, 0, 4);
+        System.arraycopy(month, 0, result, 4, 4);
+        System.arraycopy(day, 0, result, 8, 4);
+        return result;
     }
 
     public static byte[] dateToByteArray(LocalDateTime val) {
