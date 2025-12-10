@@ -81,7 +81,7 @@ public class ClientHandler extends Thread {
     // 핵심 로직: 프로토콜 코드에 따른 분기 처리
     private Protocol handleRequest(Protocol req) {
         if (req.getType() != ProtocolType.REQUEST) {
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
         }
 
         try {
@@ -94,26 +94,26 @@ public class ClientHandler extends Thread {
                     UserDTO result = userDAO.findUserByLoginId(u.getLoginId(), u.getPassword());
                     if (result != null) {
                         // 성공 시 LOGIN_RESPONSE (0x30) + 유저 데이터 반환
-                        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, 0, result);
+                        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, result);
                     } else {
                         // 실패 시 INVALID_INPUT (0x52) 반환
-                        return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, 0, null);
+                        return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, null);
                     }
                 }
 
                 case ProtocolCode.MENU_LIST_REQUEST: { // 0x03
                     // 예: 1번 식당, 점심 메뉴 조회 (클라이언트 데이터에 따라 동적 처리 가능)
                     List<MenuPriceDTO> menus = menuController.getMenus(1, "점심");
-                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_LIST_RESPONSE, 0, menus);
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_LIST_RESPONSE, menus);
                 }
 
                 case ProtocolCode.MENU_IMAGE_DOWNLOAD_REQUEST: { // 0x04
                     int menuId = (int) req.getData();
                     byte[] img = menuController.getMenuImage(menuId);
                     if (img != null) {
-                        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_IMAGE_RESPONSE, 0, img);
+                        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_IMAGE_RESPONSE,  img);
                     } else {
-                        return new Protocol(ProtocolType.RESULT, ProtocolCode.NOT_FOUND, 0, null);
+                        return new Protocol(ProtocolType.RESULT, ProtocolCode.NOT_FOUND, null);
                     }
                 }
 
@@ -127,7 +127,7 @@ public class ClientHandler extends Thread {
                 case ProtocolCode.USAGE_HISTORY_REQUEST: { // 0x09
                     int userId = (int) req.getData();
                     List<PaymentDTO> history = paymentDAO.findHistoryByUserId(userId);
-                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.USAGE_HISTORY_RESPONSE, 0, history);
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.USAGE_HISTORY_RESPONSE,  history);
                 }
 
                 // ==========================================
@@ -150,18 +150,18 @@ public class ClientHandler extends Thread {
                     // 식당별 결제 내역 (클라이언트에서 식당ID 전송 가정)
                     int restaurantId = (int) req.getData();
                     List<PaymentDTO> list = paymentDAO.findHistoryByRestaurantId(restaurantId);
-                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.ORDER_PAYMENT_HISTORY_RESPONSE, 0, list);
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.ORDER_PAYMENT_HISTORY_RESPONSE, list);
                 }
 
                 case ProtocolCode.SALES_REPORT_REQUEST: { // 0x18
                     Map<String, Long> sales = paymentDAO.getSalesStatsByRestaurant();
-                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.SALES_REPORT_RESPONSE, 0, sales);
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.SALES_REPORT_RESPONSE, sales);
                 }
 
                 case ProtocolCode.USAGE_REPORT_REQUEST: { // 0x19
                     List<String> stats = paymentDAO.getTimeSlotUsageStats();
                     // ProtocolCode에 정의된 TIME_STATS_RESPONSE (0x3A) 사용
-                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.TIME_STATS_RESPONSE, 0, stats);
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.TIME_STATS_RESPONSE, stats);
                 }
 
                 // CSV 샘플 다운로드 (중복 코드 모두 처리)
@@ -169,7 +169,7 @@ public class ClientHandler extends Thread {
                 case ProtocolCode.ADMIN_CSV_SAMPLE_REQUEST:    // 0x22
                 {
                     byte[] sample = menuController.getCsvSample();
-                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.CSV_FILE_RESPONSE, 0, sample);
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.CSV_FILE_RESPONSE, sample);
                 }
 
                 // CSV 업로드 (중복 코드 모두 처리)
@@ -182,11 +182,11 @@ public class ClientHandler extends Thread {
 
                 default:
                     System.out.println("알 수 없는 요청 코드: 0x" + Integer.toHexString(req.getCode()).toUpperCase());
-                    return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+                    return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
             }
         } catch (Exception e) {
             e.printStackTrace();
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.SERVER_ERROR, 0, null);
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.SERVER_ERROR, null);
         }
     }
 }

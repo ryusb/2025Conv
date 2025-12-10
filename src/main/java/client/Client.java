@@ -46,18 +46,18 @@ public class Client {
                         loginUser.setLoginId("insert");
                         loginUser.setPassword("test");
                         // LOGIN_REQUEST (0x02) 사용
-                        request = new Protocol(ProtocolType.REQUEST, ProtocolCode.LOGIN_REQUEST, 0, loginUser);
+                        request = new Protocol(ProtocolType.REQUEST, ProtocolCode.LOGIN_REQUEST, loginUser);
                         break;
 
                     case 2: // 개인 이용 내역 조회
                         int userId = 1;
                         // USAGE_HISTORY_REQUEST (0x09) 사용
-                        request = new Protocol(ProtocolType.REQUEST, ProtocolCode.USAGE_HISTORY_REQUEST, 0, userId);
+                        request = new Protocol(ProtocolType.REQUEST, ProtocolCode.USAGE_HISTORY_REQUEST, userId);
                         break;
 
                     case 3: // 식당별 매출 현황 조회
                         // SALES_REPORT_REQUEST (0x18) 사용
-                        request = new Protocol(ProtocolType.REQUEST, ProtocolCode.SALES_REPORT_REQUEST, 0, null);
+                        request = new Protocol(ProtocolType.REQUEST, ProtocolCode.SALES_REPORT_REQUEST, null);
                         break;
 
                     default:

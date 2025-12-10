@@ -21,7 +21,7 @@ public class PaymentController {
         // 1. 메뉴 정보 확인 (현재 가격 확인)
         // MenuPriceDAO에 findById 메서드 추가 필요 혹은 기존 메서드 활용
         MenuPriceDTO menu = menuPriceDAO.findById(request.getMenuPriceId());
-        if (menu == null) return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+        if (menu == null) return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
 
         // 2. 사용자 타입에 따른 가격 결정
         int currentPrice = request.getUserType().equals("교직원") ? menu.getPriceFac() : menu.getPriceStu();
@@ -36,7 +36,7 @@ public class PaymentController {
 
             if (coupon == null || coupon.isUsed()) {
                 // 유효하지 않은 쿠폰
-                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, "유효하지 않은 쿠폰");
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "유효하지 않은 쿠폰");
             }
 
             couponValue = coupon.getPurchaseValue(); // 구매 당시 쿠폰 가치
@@ -64,9 +64,9 @@ public class PaymentController {
 
         if (success) {
             // 추가금이 발생했다면 클라이언트에게 알려줄 수도 있음 (여기서는 성공으로 리턴)
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, 0, null);
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS,  null);
         } else {
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL,  null);
         }
     }
 }

@@ -13,6 +13,26 @@ public class Protocol {
     private int dataLength;
     private Object data;
 
+    public Protocol(byte type, byte code, Object data) {
+        this.type = type;
+        this.code = code;
+        this.data = data;
+
+        // 데이터가 있으면 미리 직렬화하여 길이를 계산해 둡니다.
+        if (data != null) {
+            try {
+                // Serializer를 이용해 실제 바이트 길이를 구함
+                byte[] bytes = Serializer.getBytes(data);
+                this.dataLength = bytes.length;
+            } catch (Exception e) {
+                e.printStackTrace();
+                this.dataLength = 0;
+            }
+        } else {
+            this.dataLength = 0;
+        }
+    }
+
     public Protocol(byte t, byte c, int dL, Object d) {
         type = t;
         code = c;
@@ -50,21 +70,24 @@ public class Protocol {
     }
 
     private DTO byteArrayToData(byte type, byte code, byte[] arr) throws Exception {
-        // RESULT 타입은 데이터 없이 상태 코드만 내려온다고 가정한다.
-        if (type == ProtocolType.RESULT) {
-            return null;
+        if (type == ProtocolType.REQUEST || type == ProtocolType.RESPONSE) {
+            return (DTO) Deserializer.getObject(arr);
         }
-
         else if (type == ProtocolType.RESPONSE) {
             return (DTO) Deserializer.getObject(arr);
         }
-
         else if (type == ProtocolType.RESULT) {
-            // 0x50 ~ 0x5F 사이의 코드는 모두 Result 코드로 인정하여 null 반환
-            // SUCCESS(0x50) ~ SERVER_ERROR(0x5F)
+            // 결과 코드 범위 체크 (성공~서버에러)
             if (code >= ProtocolCode.SUCCESS && code <= ProtocolCode.SERVER_ERROR) {
                 return null;
             }
+        }
+        try {
+            String hexCode = Integer.toHexString(code & 0xFF).toUpperCase();
+            throw new Exception("타입과 코드가 맞지 않음. Type: " + type + ", Code: 0x" + hexCode);
+        } catch (Exception e) {
+            System.out.println("Error Type: " + type + ", Code: 0x" + Integer.toHexString(code & 0xFF).toUpperCase());
+            e.printStackTrace();
         }
         return null;
     }

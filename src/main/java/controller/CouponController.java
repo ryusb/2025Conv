@@ -18,7 +18,7 @@ public class CouponController {
      */
     public Protocol upsertCouponPolicy(CouponPolicyDTO policy) {
         if (!isValid(policy)) {
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
         }
 
         if (policy.getEffectiveDate() == null) {
@@ -27,8 +27,8 @@ public class CouponController {
 
         boolean success = couponPolicyDAO.insertPolicy(policy);
         return success
-                ? new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, 0, null)
-                : new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+                ? new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS,  null)
+                : new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
     }
 
     private boolean isValid(CouponPolicyDTO policy) {
