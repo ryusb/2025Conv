@@ -1,12 +1,18 @@
 package server;
 
+import controller.MenuController;
+import controller.CouponController;
 import java.io.*;
 import java.net.Socket;
 import network.Protocol; // Protocol 객체를 사용하여 통신 처리
-import persistence.dao.UserDAO; // 예시 DAO 임포트
+import network.ProtocolCode;
+import network.ProtocolType;
+import persistence.dto.MenuPriceDTO;
 
 public class ClientHandler extends Thread {
     private final Socket clientSocket;
+    private final MenuController menuController = new MenuController();
+    private final CouponController couponController = new CouponController();
 
     // 생성자: 클라이언트 소켓을 받아서 초기화합니다.
     public ClientHandler(Socket socket) {
@@ -68,11 +74,37 @@ public class ClientHandler extends Thread {
         return java.util.Arrays.copyOf(buffer, bytesRead);
     }
 
-    // ⚠️ TODO: 수신된 Protocol 객체를 분석하고 응답을 생성하는 메서드 구현 필요
+    // 수신된 Protocol 객체를 분석하고 응답을 생성하는 메서드 구현
     private Protocol handleRequest(Protocol receivedProtocol) {
-        // ProtocolType과 ProtocolCode에 따라 DAO를 호출하는 switch/case 구문이 들어갑니다.
-        // 예: ProtocolCode.LOGIN_REQUEST일 경우 UserDAO를 호출
-        // 임시 응답 반환
-        return new Protocol(network.ProtocolType.RESULT, network.ProtocolCode.SUCCESS, 0, null);
+        if (receivedProtocol.getType() != ProtocolType.REQUEST) {
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+        }
+
+        byte code = receivedProtocol.getCode();
+        switch (code) {
+            case ProtocolCode.ADMIN_MENU_REGISTER_REQUEST: {
+                Object data = receivedProtocol.getData();
+                if (!(data instanceof MenuPriceDTO)) {
+                    return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+                }
+                return menuController.registerOrUpdateMenu((MenuPriceDTO) data);
+            }
+            case ProtocolCode.ADMIN_IMAGE_UPLOAD_REQUEST: {
+                Object data = receivedProtocol.getData();
+                if (!(data instanceof MenuPriceDTO)) {
+                    return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+                }
+                return menuController.uploadMenuImage((MenuPriceDTO) data);
+            }
+            case ProtocolCode.ADMIN_POLICY_REGISTER_REQUEST: {
+                Object data = receivedProtocol.getData();
+                if (!(data instanceof persistence.dto.CouponPolicyDTO)) {
+                    return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+                }
+                return couponController.upsertCouponPolicy((persistence.dto.CouponPolicyDTO) data);
+            }
+            default:
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+        }
     }
 }
