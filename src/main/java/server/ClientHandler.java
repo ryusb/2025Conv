@@ -110,16 +110,22 @@ public class ClientHandler extends Thread {
         if (req.getType() != ProtocolType.REQUEST) {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
         }
-/*
+
         // 권한 체크 로직 (관리자 기능 접근 제어)
         // ProtocolCode 0x10 ~ 0x29 범위는 관리자 전용이라고 가정
         if (req.getCode() >= 0x10 && req.getCode() <= 0x29) {
+            System.out.println("[DEBUG] 권한 체크 시작. 요청 코드: 0x" + Integer.toHexString(req.getCode()));
+            if (this.loginUser == null) {
+                System.out.println("[DEBUG] loginUser가 NULL입니다! (로그인 처리가 안 됨)");
+            } else {
+                System.out.println("[DEBUG] 현재 유저: " + this.loginUser.getLoginId() + ", 타입: " + this.loginUser.getUserType());
+            }
             if (this.loginUser == null || !"admin".equals(this.loginUser.getUserType())) {
                 // 0x55: PERMISSION_DENIED 반환
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.PERMISSION_DENIED, "관리자 권한이 필요합니다.");
             }
         }
-*/
+
         try {
             switch (req.getCode()) {
                 // ==========================================

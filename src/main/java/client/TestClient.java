@@ -452,6 +452,12 @@ public class TestClient {
             System.out.println("❌ 실패 (FAIL): " + res.getData());
         } else if (res.getCode() == ProtocolCode.PERMISSION_DENIED) {
             System.out.println("⛔ 권한 없음 (PERMISSION_DENIED)");
+            System.out.println("--[DEBUG] 권한 체크 시작. 요청 코드: 0x" + Integer.toHexString(res.getCode()));
+            if (currentUser == null) {
+                System.out.println("--[DEBUG] loginUser가 NULL입니다! (로그인 처리가 안 됨)");
+            } else {
+                System.out.println("--[DEBUG] 현재 유저: " + currentUser.getLoginId() + ", 타입: " + currentUser.getUserType());
+            }
         } else {
             System.out.println("⚠️ 기타 응답 코드: 0x" + Integer.toHexString(res.getCode()));
         }
