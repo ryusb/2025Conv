@@ -73,12 +73,9 @@ public class Protocol {
         return resultArray;
     }
 
-    private DTO byteArrayToData(byte type, byte code, byte[] arr) throws Exception {
+    private Object byteArrayToData(byte type, byte code, byte[] arr) throws Exception {
         if (type == ProtocolType.REQUEST || type == ProtocolType.RESPONSE) {
-            return (DTO) Deserializer.getObject(arr);
-        }
-        else if (type == ProtocolType.RESPONSE) {
-            return (DTO) Deserializer.getObject(arr);
+            return Deserializer.getObject(arr);
         }
         else if (type == ProtocolType.RESULT) {
             // 결과 코드 범위 체크 (성공~서버에러)
