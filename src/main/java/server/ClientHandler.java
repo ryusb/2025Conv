@@ -110,8 +110,8 @@ public class ClientHandler extends Thread {
         if (req.getType() != ProtocolType.REQUEST) {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
         }
-
-        // [추가] 권한 체크 로직 (관리자 기능 접근 제어)
+/*
+        // 권한 체크 로직 (관리자 기능 접근 제어)
         // ProtocolCode 0x10 ~ 0x29 범위는 관리자 전용이라고 가정
         if (req.getCode() >= 0x10 && req.getCode() <= 0x29) {
             if (this.loginUser == null || !"admin".equals(this.loginUser.getUserType())) {
@@ -119,7 +119,7 @@ public class ClientHandler extends Thread {
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.PERMISSION_DENIED, "관리자 권한이 필요합니다.");
             }
         }
-
+*/
         try {
             switch (req.getCode()) {
                 // ==========================================
@@ -129,10 +129,9 @@ public class ClientHandler extends Thread {
                     UserDTO u = (UserDTO) req.getData();
                     UserDTO result = userDAO.findUserByLoginId(u.getLoginId(), u.getPassword());
                     if (result != null) {
-                        // 성공 시 LOGIN_RESPONSE (0x30) + 유저 데이터 반환
+                        this.loginUser = result;
                         return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, result);
                     } else {
-                        // 실패 시 INVALID_INPUT (0x52) 반환
                         return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, null);
                     }
                 }
