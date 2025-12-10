@@ -1,9 +1,9 @@
 package persistence.dao;
 
 import persistence.dto.RestaurantDTO;
+import persistence.dto.MenuPriceDTO;
 import network.DBConnectionManager; // ⚠️ 패키지 경로 변경
 import java.sql.*;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 

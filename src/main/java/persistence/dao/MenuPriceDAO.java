@@ -40,4 +40,94 @@ public class MenuPriceDAO {
         }
         return menuList;
     }
+    // 메뉴 신규 등록
+    public boolean insertMenu(MenuPriceDTO menu) {
+        String sql = "INSERT INTO menu_price (restaurant_id, restaurant_name, semester_name, is_current_semester, meal_time, menu_name, price_stu, price_fac) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            pstmt.setInt(1, menu.getRestaurantId());
+            pstmt.setString(2, menu.getRestaurantName());
+            pstmt.setString(3, menu.getSemesterName());
+            pstmt.setBoolean(4, menu.isCurrentSemester());
+            pstmt.setString(5, menu.getMealTime());
+            pstmt.setString(6, menu.getMenuName());
+            pstmt.setInt(7, menu.getPriceStu());
+            pstmt.setInt(8, menu.getPriceFac());
+
+            int affectedRows = pstmt.executeUpdate();
+            if (affectedRows == 0) {
+                return false;
+            }
+
+            try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    menu.setMenuPriceId(generatedKeys.getInt(1));
+                }
+            }
+            return true;
+        } catch (SQLException e) {
+            System.err.println("RestaurantDAO - 메뉴 등록 중 DB 오류: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // 기존 메뉴 수정
+    public boolean updateMenu(MenuPriceDTO menu) {
+        String sql = "UPDATE menu_price SET restaurant_id = ?, restaurant_name = ?, semester_name = ?, is_current_semester = ?, " +
+                "meal_time = ?, menu_name = ?, price_stu = ?, price_fac = ? WHERE menu_price_id = ?";
+
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, menu.getRestaurantId());
+            pstmt.setString(2, menu.getRestaurantName());
+            pstmt.setString(3, menu.getSemesterName());
+            pstmt.setBoolean(4, menu.isCurrentSemester());
+            pstmt.setString(5, menu.getMealTime());
+            pstmt.setString(6, menu.getMenuName());
+            pstmt.setInt(7, menu.getPriceStu());
+            pstmt.setInt(8, menu.getPriceFac());
+            pstmt.setInt(9, menu.getMenuPriceId());
+
+            int affectedRows = pstmt.executeUpdate();
+            return affectedRows > 0;
+        } catch (SQLException e) {
+            System.err.println("RestaurantDAO - 메뉴 수정 중 DB 오류: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // 메뉴 id 존재 여부 확인
+    public boolean existsById(int menuPriceId) {
+        String sql = "SELECT 1 FROM menu_price WHERE menu_price_id = ?";
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, menuPriceId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            System.err.println("RestaurantDAO - 메뉴 존재 여부 확인 중 DB 오류: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // 메뉴 이미지 경로 업데이트
+    public boolean updateMenuImagePath(int menuPriceId, String imagePath) {
+        String sql = "UPDATE menu_price SET image_path = ? WHERE menu_price_id = ?";
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, imagePath);
+            pstmt.setInt(2, menuPriceId);
+            int affectedRows = pstmt.executeUpdate();
+            return affectedRows > 0;
+        } catch (SQLException e) {
+            System.err.println("RestaurantDAO - 메뉴 이미지 경로 업데이트 중 DB 오류: " + e.getMessage());
+            return false;
+        }
+    }
+
 }
