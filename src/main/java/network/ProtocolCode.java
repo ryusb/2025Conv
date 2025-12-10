@@ -1,6 +1,8 @@
 package network;
 
 public class ProtocolCode {
+    // @=$& 파싱용
+
     // ----------------------------------------------------
     // 1. 요청 코드 (REQUEST, ProtocolType 0x01) : 클라이언트 -> 서버
     // ----------------------------------------------------
@@ -8,6 +10,7 @@ public class ProtocolCode {
     // 공통 기능
     public static final byte LOGIN_REQUEST = 0x10;          // 로그인 요청
     public static final byte LOGOUT_REQUEST = 0x1F;         // 로그아웃 요청
+
 
     // 사용자(학생/교직원) 기능
     public static final byte MENU_QUERY_REQUEST = 0x20;       // 메뉴 조회(텍스트) 요청
@@ -22,7 +25,9 @@ public class ProtocolCode {
     public static final byte ADMIN_PRICE_REGISTER_REQUEST = 0x32;   // 식당별 가격 등록 요청
     public static final byte ADMIN_POLICY_REGISTER_REQUEST = 0x33;  // 쿠폰 정책 관리 요청
     public static final byte ADMIN_SALES_QUERY_REQUEST = 0x34;      // 매출 현황/이용 현황 조회 요청
-
+    public static final byte ADMIN_HISTORY_BY_RESTAURANT_REQUEST = 0x35; // 식당별 결제 내역
+    public static final byte ADMIN_HISTORY_BY_PERIOD_REQUEST = 0x36;     // 기간별 결제 내역
+    public static final byte ADMIN_TIME_STATS_REQUEST = 0x37;            // 시간대별 통계
 
     // ----------------------------------------------------
     // 2. 응답 코드 (RESPONSE, ProtocolType 0x02) : 서버 -> 클라이언트 (데이터 포함)
