@@ -39,35 +39,31 @@ public class Deserializer {
         return makeObject(c, objInfo, idx);
     }
 
-
     public static int checkVersion(Class<?> c, byte[] objInfo, int idx) throws Exception {
-        long destUID = DEFAULT_UID;
-
-        try {
-            // java. 으로 시작하는 표준 클래스(Integer, String, Map 등)는
-            // serialVersionUID 체크(Reflection)를 건너뜁니다.
-            if (!c.getName().startsWith("java.")) {
-                Field uidField = c.getDeclaredField(UID_FIELD_NAME);
-                uidField.setAccessible(true);
-                destUID = (long) uidField.get(c);
-            }
+        if (c.getName().startsWith("java.")) {
+            return idx + LONG_LENGTH;
         }
-        catch (NoSuchFieldException e) {
-            // 필드가 없으면 기본값(0L) 사용
+
+        long destUID = DEFAULT_UID;
+        try {
+            Field uidField = c.getDeclaredField(UID_FIELD_NAME);
+            uidField.setAccessible(true);
+            destUID = (long) uidField.get(null); // static 필드는 인스턴스 대신 null 사용
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            // 필드가 없거나 접근 불가하면 기본값 유지
         }
 
         byte[] longByteArray = new byte[LONG_LENGTH];
-        System.arraycopy(objInfo, idx, longByteArray, 0, LONG_LENGTH); idx += LONG_LENGTH;
+        System.arraycopy(objInfo, idx, longByteArray, 0, LONG_LENGTH);
+        idx += LONG_LENGTH;
         long srcUID = byteArrayToLong(longByteArray);
 
-        // 사용자 정의 클래스인 경우에만 버전을 비교 (표준 클래스는 srcUID가 0L로 처리되므로 항상 통과)
-        if (!c.getName().startsWith("java.") && destUID != srcUID) {
-            throw new Exception("not match version");
+        if (destUID != srcUID) {
+            throw new Exception("버전(serialVersionUID)이 일치하지 않습니다. 클래스: " + c.getName());
         }
 
         return idx;
     }
-
 
     public static Object makeObject(Class<?> c, byte[] objInfo, int idx) throws Exception {
         // 기본 타입 처리
