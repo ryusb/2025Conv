@@ -43,19 +43,21 @@ public class Client {
                 switch (choice) {
                     case 1: // 로그인
                         UserDTO loginUser = new UserDTO();
-                        loginUser.setLoginId("student1"); // 테스트 ID
-                        loginUser.setPassword("1234");
+                        loginUser.setLoginId("insert");
+                        loginUser.setPassword("test");
+                        // LOGIN_REQUEST (0x02) 사용
                         request = new Protocol(ProtocolType.REQUEST, ProtocolCode.LOGIN_REQUEST, 0, loginUser);
                         break;
 
                     case 2: // 개인 이용 내역 조회
-                        // 테스트를 위해 ID가 1인 유저라고 가정
                         int userId = 1;
+                        // USAGE_HISTORY_REQUEST (0x09) 사용
                         request = new Protocol(ProtocolType.REQUEST, ProtocolCode.USAGE_HISTORY_REQUEST, 0, userId);
                         break;
 
                     case 3: // 식당별 매출 현황 조회
-                        request = new Protocol(ProtocolType.REQUEST, ProtocolCode.ADMIN_SALES_QUERY_REQUEST, 0, null);
+                        // SALES_REPORT_REQUEST (0x18) 사용
+                        request = new Protocol(ProtocolType.REQUEST, ProtocolCode.SALES_REPORT_REQUEST, 0, null);
                         break;
 
                     default:
@@ -100,17 +102,22 @@ public class Client {
 
                     Protocol response = new Protocol(packet);
                     System.out.println("⬅️ 응답 수신 완료. 코드: 0x" + Integer.toHexString(response.getCode() & 0xFF).toUpperCase());
+
                     Object data = response.getData();
-                    if (response.getCode() == ProtocolCode.LOGIN_RESPONSE) {
+
+                    // 응답 코드 체크 수정
+                    if (response.getCode() == ProtocolCode.SUCCESS) { // 0x50
                         UserDTO user = (UserDTO) data;
                         System.out.println("✅ 로그인 성공: " + user.getLoginId());
-                    } else if (response.getCode() == ProtocolCode.USAGE_HISTORY_RESPONSE) {
+                    } else if (response.getCode() == ProtocolCode.USAGE_HISTORY_RESPONSE) { // 0x36
                         List<PaymentDTO> list = (List<PaymentDTO>) data;
                         System.out.println("📄 내역 수: " + list.size());
                         for (PaymentDTO p : list) System.out.println(" - " + p.getMenuName());
-                    } else if (response.getCode() == ProtocolCode.ADMIN_SALES_QUERY_RESPONSE) {
+                    } else if (response.getCode() == ProtocolCode.SALES_REPORT_RESPONSE) { // 0x38
                         Map<String, Long> sales = (Map<String, Long>) data;
                         System.out.println("💰 매출: " + sales);
+                    } else if (response.getCode() == ProtocolCode.INVALID_INPUT) { // 0x52
+                        System.out.println("❌ 로그인 실패: 아이디/비밀번호 불일치");
                     } else {
                         System.out.println("❌ 실패 또는 알 수 없는 응답");
                     }

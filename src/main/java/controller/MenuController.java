@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * 관리자 메뉴 등록/수정/ 이미지 저장 요청을 처리
@@ -20,6 +21,10 @@ import java.time.format.DateTimeFormatter;
 public class MenuController {
 
     private final MenuPriceDAO menupriceDAO = new MenuPriceDAO();
+
+    public List<MenuPriceDTO> getMenus(int restaurantId, String mealTime) {
+        return menupriceDAO.findCurrentMenus(restaurantId, mealTime);
+    }
 
     /**
      * menuPriceId가 0이하면 신규 등록, 그 이상이면 수정으로 처리.

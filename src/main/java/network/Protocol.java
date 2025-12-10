@@ -50,7 +50,7 @@ public class Protocol {
     }
 
     private DTO byteArrayToData(byte type, byte code, byte[] arr) throws Exception {
-        if (type == ProtocolType.REQUEST || type == ProtocolType.RESPONSE) {
+        if (type == ProtocolType.REQUEST) {
             return (DTO) Deserializer.getObject(arr);
         }
 
@@ -59,22 +59,17 @@ public class Protocol {
         }
 
         else if (type == ProtocolType.RESULT) {
-            if (code == ProtocolCode.SUCCESS ||
-                    code == ProtocolCode.FAIL ||
-                    code == ProtocolCode.INVALID_CREDENTIALS ||
-                    code == ProtocolCode.ACCESS_DENIED ||
-                    code == ProtocolCode.ADDITIONAL_FEE_REQUIRED ||
-                    code == ProtocolCode.SERVER_ERROR) {
+            // [수정됨] 0x50 ~ 0x5F 사이의 코드는 모두 Result 코드로 인정하여 null 반환
+            // SUCCESS(0x50) ~ SERVER_ERROR(0x5F)
+            if (code >= ProtocolCode.SUCCESS && code <= ProtocolCode.SERVER_ERROR) {
                 return null;
             }
         }
 
         try {
-            // 디버깅을 위해 16진수 코드도 함께 출력하도록 수정
             String hexCode = Integer.toHexString(code & 0xFF).toUpperCase();
             throw new Exception("타입과 코드가 맞지 않음. Type: " + type + ", Code: 0x" + hexCode);
         } catch (Exception e) {
-            System.out.println("Error Type: " + type + ", Code: 0x" + Integer.toHexString(code & 0xFF).toUpperCase());
             e.printStackTrace();
         }
 
