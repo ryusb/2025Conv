@@ -40,6 +40,43 @@ public class MenuPriceDAO {
         }
         return menuList;
     }
+
+    // 식당/날짜(옵션)/학기(옵션)/시간대(옵션)로 메뉴 목록 조회
+    public List<MenuPriceDTO> findMenusByRestaurantAndDate(int restaurantId, String menuDate) {
+        List<MenuPriceDTO> menuList = new ArrayList<>();
+        // date 컬럼이 없을 수도 있으므로 try-catch로 감싼다. 없으면 날짜 조건을 생략한다.
+        String sqlWithDate = "SELECT menu_price_id, menu_name FROM menu_price WHERE restaurant_id = ? AND date = ?";
+        String sqlFallback = "SELECT menu_price_id, menu_name FROM menu_price WHERE restaurant_id = ?";
+        try (Connection conn = DBConnectionManager.getConnection()) {
+            PreparedStatement pstmt;
+            if (menuDate != null && !menuDate.isBlank()) {
+                try {
+                    pstmt = conn.prepareStatement(sqlWithDate);
+                    pstmt.setInt(1, restaurantId);
+                    pstmt.setString(2, menuDate);
+                } catch (SQLException syntax) {
+                    // date 컬럼이 없는 경우 fallback
+                    pstmt = conn.prepareStatement(sqlFallback);
+                    pstmt.setInt(1, restaurantId);
+                }
+            } else {
+                pstmt = conn.prepareStatement(sqlFallback);
+                pstmt.setInt(1, restaurantId);
+            }
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    MenuPriceDTO menu = new MenuPriceDTO();
+                    menu.setMenuPriceId(rs.getInt("menu_price_id"));
+                    menu.setMenuName(rs.getString("menu_name"));
+                    menuList.add(menu);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("MenuPriceDAO - 메뉴 목록 조회 중 DB 오류: " + e.getMessage());
+        }
+        return menuList;
+    }
     // 메뉴 신규 등록
     public boolean insertMenu(MenuPriceDTO menu) {
         String sql = "INSERT INTO menu_price (restaurant_id, restaurant_name, semester_name, is_current_semester, meal_time, menu_name, price_stu, price_fac, date) " +
