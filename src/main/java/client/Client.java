@@ -6,6 +6,7 @@ import java.util.Scanner;
 
 import network.*;
 import persistence.dto.UserDTO;
+import service.MainService;
 import service.UserService;
 import service.UserSession;
 
@@ -15,67 +16,26 @@ public class Client {
     private static final int PORT = 9000;
 
     public static void main(String[] args) {
-        try (
-                Socket socket = new Socket(SERVER_IP, PORT);
-                OutputStream os = socket.getOutputStream();
-                InputStream is = socket.getInputStream();
-                Scanner sc = new Scanner(System.in)
-        ) {
-            System.out.println("🎉 서버 (" + SERVER_IP + ")에 성공적으로 접속했습니다.");
-            ClientSocketHolder.init(is, os);
+            try (
+                    Socket socket = new Socket(SERVER_IP, PORT);
+                    OutputStream os = socket.getOutputStream();
+                    InputStream is = socket.getInputStream()
+            ) {
+                System.out.println("🎉 서버 (" + SERVER_IP + ")에 성공적으로 접속했습니다.");
+                ClientSocketHolder.init(is, os);
 
-            // ===========================
-            // ✔ 1) 로그인만 처리
-            // ===========================
-            UserDTO loggedInUser = null;
+                // =================================================
+                // ✔ MainService.run() 이 로그인 + 권한 분기 담당
+                // =================================================
+                MainService.run();
 
-            while (loggedInUser == null) {
-                System.out.println("\n===== 로그인 =====");
-                System.out.print("아이디: ");
-                String loginId = sc.nextLine();
+                System.out.println("클라이언트 종료.");
 
-                System.out.print("패스워드: ");
-                String password = sc.nextLine();
-
-                UserDTO reqUser = new UserDTO();
-                reqUser.setLoginId(loginId);
-                reqUser.setPassword(password);
-
-                Protocol request = new Protocol(
-                        ProtocolType.REQUEST,
-                        ProtocolCode.LOGIN_REQUEST,
-                        reqUser
-                );
-
-                os.write(request.getBytes());
-                os.flush();
-
-                Protocol response = receive(is);
-
-                if (response.getCode() == ProtocolCode.LOGIN_RESPONSE) {
-                    loggedInUser = (UserDTO) response.getData();
-                    System.out.println("✅ 로그인 성공: " + loggedInUser.getLoginId());
-
-                    // 세션 저장
-                    UserSession.setUser(loggedInUser);
-
-                } else {
-                    System.out.println("❌ 로그인 실패. 다시 시도하세요.");
-                }
+            } catch (Exception e) {
+                System.err.println("❌ 클라이언트 오류: " + e.getMessage());
+                e.printStackTrace();
             }
-
-            // ===========================
-            // ✔ 2) 로그인 성공 → 사용자 메뉴 진입
-            // ===========================
-            UserService.mainService();
-
-            System.out.println("클라이언트 종료.");
-
-        } catch (Exception e) {
-            System.err.println("❌ 클라이언트 오류: " + e.getMessage());
-            e.printStackTrace();
         }
-    }
 
     // =======================
     //  패킷 수신 전용 메서드

@@ -11,6 +11,7 @@ import java.util.Map;
 import network.Protocol;
 import network.ProtocolCode;
 import network.ProtocolType;
+import persistence.dao.MenuPriceDAO;
 import persistence.dao.PaymentDAO;
 import persistence.dao.UserDAO;
 import persistence.dto.*;
@@ -113,7 +114,7 @@ public class ClientHandler extends Thread {
         // [추가] 권한 체크 로직 (관리자 기능 접근 제어)
         // ProtocolCode 0x10 ~ 0x29 범위는 관리자 전용이라고 가정
         if (req.getCode() >= 0x10 && req.getCode() <= 0x29) {
-            if (this.loginUser == null || !"관리자".equals(this.loginUser.getUserType())) {
+            if (this.loginUser == null || !"admin".equals(this.loginUser.getUserType())) {
                 // 0x55: PERMISSION_DENIED 반환
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.PERMISSION_DENIED, "관리자 권한이 필요합니다.");
             }
@@ -138,19 +139,13 @@ public class ClientHandler extends Thread {
 
                 case ProtocolCode.MENU_LIST_REQUEST: { // 0x03
                     Object data = req.getData();
-                    int restaurantId = 1;
-                    String menuDate = null;
-                    if (data instanceof java.util.Map<?, ?> map) {
-                        Object rid = map.get("restaurantId");
-                        if (rid instanceof Integer) {
-                            restaurantId = (Integer) rid;
-                        }
-                        Object md = map.get("menuDate");
-                        if (md instanceof String) {
-                            menuDate = (String) md;
-                        }
+                    if (data == null || !(data instanceof MenuPriceDTO)) {
+                        return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, null);
                     }
-                    List<MenuPriceDTO> menus = menuController.getMenusByRestaurantAndDate(restaurantId, menuDate);
+                    MenuPriceDTO inputDto = (MenuPriceDTO) data;
+                    int restId = inputDto.getRestaurantId();
+                    String time = inputDto.getMealTime();
+                    List<MenuPriceDTO> menus = menuController.getMenus(restId, time);
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_LIST_RESPONSE, menus);
                 }
 
