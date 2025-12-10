@@ -2,6 +2,7 @@ package network;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,11 +35,8 @@ public class Deserializer {
 
         Class<?> c = Class.forName(name);
         idx = checkVersion(c, objInfo, idx);
-        Object result = null;
 
-        result = makeObject(c, objInfo, idx);
-
-        return result;
+        return makeObject(c, objInfo, idx);
     }
 
 
@@ -46,17 +44,24 @@ public class Deserializer {
         long destUID = DEFAULT_UID;
 
         try {
-            Field uidField = c.getDeclaredField(UID_FIELD_NAME);
-            uidField.setAccessible(true);
-            destUID = (long) uidField.get(c);
+            // java. 으로 시작하는 표준 클래스(Integer, String, Map 등)는
+            // serialVersionUID 체크(Reflection)를 건너뜁니다.
+            if (!c.getName().startsWith("java.")) {
+                Field uidField = c.getDeclaredField(UID_FIELD_NAME);
+                uidField.setAccessible(true);
+                destUID = (long) uidField.get(c);
+            }
         }
-        catch (NoSuchFieldException e) {  }
+        catch (NoSuchFieldException e) {
+            // 필드가 없으면 기본값(0L) 사용
+        }
 
         byte[] longByteArray = new byte[LONG_LENGTH];
         System.arraycopy(objInfo, idx, longByteArray, 0, LONG_LENGTH); idx += LONG_LENGTH;
         long srcUID = byteArrayToLong(longByteArray);
 
-        if (destUID != srcUID) {
+        // 사용자 정의 클래스인 경우에만 버전을 비교 (표준 클래스는 srcUID가 0L로 처리되므로 항상 통과)
+        if (!c.getName().startsWith("java.") && destUID != srcUID) {
             throw new Exception("not match version");
         }
 
@@ -210,31 +215,5 @@ public class Deserializer {
         return (double)( (0xff & arr[0]) << 8*7 | (0xff & arr[1]) << 8*6 | (0xff & arr[2]) << 8*5 |
                 (0xff & arr[3]) << 8*4 | (0xff & arr[4]) << 8*3 | (0xff & arr[5]) << 8*2 |
                 (0xff & arr[6]) << 8 | (0xff & arr[7]));
-    }
-
- //llm 수정 권장 내용 인지
-    public static LocalDateTime byteArrayToDate(byte[] arr) {
-        final int LENGTH = 4;
-
-        byte[] yearByteArray = new byte[LENGTH];
-        byte[] monthByteArray = new byte[LENGTH];
-        byte[] dayByteArray = new byte[LENGTH];
-        byte[] hourByteArray = new byte[LENGTH];
-        byte[] minuteByteArray = new byte[LENGTH];
-
-        int pos = 0;
-        System.arraycopy(yearByteArray, 0, arr, pos, LENGTH); pos += LENGTH;
-        System.arraycopy(monthByteArray, 0, arr, pos, LENGTH); pos += LENGTH;
-        System.arraycopy(dayByteArray, 0, arr, pos, LENGTH); pos += LENGTH;
-        System.arraycopy(hourByteArray, 0, arr, pos, LENGTH); pos += LENGTH;
-        System.arraycopy(minuteByteArray, 0, arr, pos, LENGTH); pos += LENGTH;
-
-        int year = byteArrayToInt(yearByteArray);
-        int month = byteArrayToInt(monthByteArray);
-        int day = byteArrayToInt(dayByteArray);
-        int hour = byteArrayToInt(hourByteArray);
-        int minute = byteArrayToInt(minuteByteArray);
-
-        return LocalDateTime.of(year, month, day, hour, minute);
     }
 }

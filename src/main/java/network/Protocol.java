@@ -3,6 +3,10 @@ import lombok.Getter;
 import lombok.Setter;
 import persistence.dto.DTO;
 
+import java.io.ByteArrayInputStream;
+import java.io.EOFException;
+import java.io.ObjectInputStream;
+
 @Getter
 @Setter
 public class Protocol {
@@ -92,25 +96,23 @@ public class Protocol {
         return null;
     }
 
-    public void byteArrayToProtocol(byte[] arr) {
-        final int INT_LENGTH = 4;
-        type = arr[0];
-        code = arr[1];
+    public void byteArrayToProtocol(byte[] bytes) {
+        this.type = bytes[0];
+        this.code = bytes[1];
+        this.dataLength = java.nio.ByteBuffer.wrap(bytes, 2, 4).getInt();
 
-        int pos = 0;
-        pos += 2;
-        byte[] dataLengthByteArray = new byte[4];
-        System.arraycopy(arr, pos, dataLengthByteArray, 0, INT_LENGTH); pos += 4;
-        dataLength = Deserializer.byteArrayToInt(dataLengthByteArray);
+        if (dataLength > 0) {
+            byte[] payload = new byte[dataLength];
+            System.arraycopy(bytes, HEADER_SIZE, payload, 0, dataLength);
 
-        byte[] dataArray = new byte[dataLength];
-        // dataLength는 arr[2]부터 arr[5]에 있으므로, data는 arr[6]부터 시작합니다.
-        System.arraycopy(arr, HEADER_SIZE, dataArray, 0, dataLength); pos += dataLength;
-        try {
-            data = byteArrayToData(type, code, dataArray);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
+            try {
+                this.data = byteArrayToData(type, code, payload);
+            } catch (Exception e) {
+                System.out.println("데이터 역직렬화 실패: " + e.getMessage());
+                e.printStackTrace();
+            }
+        } else {
+            this.data = null;
         }
     }
 }
