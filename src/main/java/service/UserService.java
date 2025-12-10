@@ -50,6 +50,7 @@ public class UserService {
     }
 
     private static void printMenu(String[] menu) {
+        System.out.println();
         OutputHandler.showBar();
         OutputHandler.showTitle(menu[0]);
         for (int i = 1; i < menu.length; i++) {
@@ -65,10 +66,9 @@ public class UserService {
             printMenu(USER_ORDER_MENU);
 
             switch (InputHandler.getInt("입력")) {
-                // TODO : 이거 바꿔야 함
-                case 1 -> OrderService.order("교직원식당");
-                case 2 -> OrderService.order("학생식당");
-                case 3 -> OrderService.order("분식당");
+                case 1 -> OrderService.order("facCafeteria");
+                case 2 -> OrderService.order("stdCafeteria");
+                case 3 -> OrderService.order("snack");
                 case 4 -> isRunning = false;
                 default -> OutputHandler.showError("잘못된 선택입니다");
             }
