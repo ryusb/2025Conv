@@ -4,10 +4,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Deserializer {
     final static String UID_FIELD_NAME = "serialVersionUID";
@@ -95,7 +92,15 @@ public class Deserializer {
             System.arraycopy(objInfo, idx, strBytes, 0, len);
             return new String(strBytes);
         }
+        if (c == byte[].class) {
+            byte[] lenBytes = new byte[INT_LENGTH];
+            System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
+            int len = byteArrayToInt(lenBytes);
 
+            byte[] data = new byte[len];
+            System.arraycopy(objInfo, idx, data, 0, len);
+            return data;
+        }
         // List 복원
         if (List.class.isAssignableFrom(c)) {
             List<Object> list = new ArrayList<>();
@@ -144,6 +149,8 @@ public class Deserializer {
 
         Object result = c.getConstructor().newInstance();
         Field[] member = c.getDeclaredFields();
+
+        Arrays.sort(member, Comparator.comparing(Field::getName));
 
         for (int i = 0; i < member.length; i++) {
             if (!Modifier.isStatic(member[i].getModifiers())) {

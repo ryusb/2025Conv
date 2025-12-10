@@ -11,6 +11,7 @@ import java.util.Map;
 import network.Protocol;
 import network.ProtocolCode;
 import network.ProtocolType;
+import persistence.dao.MenuPriceDAO;
 import persistence.dao.PaymentDAO;
 import persistence.dao.UserDAO;
 import persistence.dto.*;
@@ -113,7 +114,7 @@ public class ClientHandler extends Thread {
         // [추가] 권한 체크 로직 (관리자 기능 접근 제어)
         // ProtocolCode 0x10 ~ 0x29 범위는 관리자 전용이라고 가정
         if (req.getCode() >= 0x10 && req.getCode() <= 0x29) {
-            if (this.loginUser == null || !"관리자".equals(this.loginUser.getUserType())) {
+            if (this.loginUser == null || !"admin".equals(this.loginUser.getUserType())) {
                 // 0x55: PERMISSION_DENIED 반환
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.PERMISSION_DENIED, "관리자 권한이 필요합니다.");
             }
@@ -138,7 +139,8 @@ public class ClientHandler extends Thread {
 
                 case ProtocolCode.MENU_LIST_REQUEST: { // 0x03
                     // 예: 1번 식당, 점심 메뉴 조회 (클라이언트 데이터에 따라 동적 처리 가능)
-                    List<MenuPriceDTO> menus = menuController.getMenus(1, "점심");
+                    MenuPriceDTO menuPriceDTO = (MenuPriceDTO) req.getData();
+                    List<MenuPriceDTO> menus = menuController.getMenus(menuPriceDTO.getRestaurantId(), menuPriceDTO.getMealTime());
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_LIST_RESPONSE, menus);
                 }
 
