@@ -50,7 +50,6 @@ public class Protocol {
         return resultArray;
     }
 
-<<<<<<< HEAD
     private DTO byteArrayToData(byte type, byte code, byte[] arr) throws Exception {
         // RESULT 타입은 데이터 없이 상태 코드만 내려온다고 가정한다.
         if (type == ProtocolType.RESULT) {
@@ -68,28 +67,6 @@ public class Protocol {
         // 정의되지 않은 타입은 null 처리
         return null;
     }
-=======
-    private DTO byteArrayToData(byte type, byte code, byte[] arr) throws Exception {
-        if (type == ProtocolType.REQUEST || type == ProtocolType.RESPONSE) {
-            return (DTO) Deserializer.getObject(arr);
-        }
-        else if (type == ProtocolType.RESULT) {
-            // RESULT 타입은 DTO가 없을 수 있음
-            if (code == ProtocolCode.SUCCESS || code == ProtocolCode.FAIL) {
-                return null;
-            }
-        }
-
-        try {
-            throw new Exception("타입과 코드가 맞지 않음");
-        } catch (Exception e) {
-            System.out.println(type + " " + code);
-            e.printStackTrace();
-        }
-
-        return null;
-    }
->>>>>>> main
 
     public void byteArrayToProtocol(byte[] arr) {
         final int INT_LENGTH = 4;

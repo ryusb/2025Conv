@@ -3,6 +3,8 @@ package server;
 import controller.MenuController;
 import controller.CouponController;
 import controller.PriceController;
+import persistence.dao.UserDAO;
+import persistence.dto.UserDTO;
 import java.io.*;
 import java.net.Socket;
 import network.Protocol; // Protocol 객체를 사용하여 통신 처리
@@ -15,6 +17,7 @@ public class ClientHandler extends Thread {
     private final MenuController menuController = new MenuController();
     private final CouponController couponController = new CouponController();
     private final PriceController priceController = new PriceController();
+    private final UserDAO userDAO = new UserDAO();
 
     // 생성자: 클라이언트 소켓을 받아서 초기화합니다.
     public ClientHandler(Socket socket) {
@@ -84,6 +87,18 @@ public class ClientHandler extends Thread {
 
         byte code = receivedProtocol.getCode();
         switch (code) {
+            case ProtocolCode.LOGIN_REQUEST: {
+                Object data = receivedProtocol.getData();
+                if (!(data instanceof UserDTO)) {
+                    return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+                }
+                UserDTO loginReq = (UserDTO) data;
+                UserDTO found = userDAO.findUserByLoginId(loginReq.getLoginId(), loginReq.getPassword());
+                if (found != null) {
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, 0, found);
+                }
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+            }
             case ProtocolCode.MENU_INSERT_REQUEST: {
                 Object data = receivedProtocol.getData();
                 if (!(data instanceof MenuPriceDTO)) {
@@ -105,18 +120,18 @@ public class ClientHandler extends Thread {
                 }
                 return couponController.upsertCouponPolicy((persistence.dto.CouponPolicyDTO) data);
             }
-            case ProtocolCode.ADMIN_PRICE_REGISTER_REQUEST: {
-                Object data = receivedProtocol.getData();
-                if (!(data instanceof MenuPriceDTO)) {
-                    return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
-                }
-                MenuPriceDTO menu = (MenuPriceDTO) data;
-                // menuPriceId가 있으면 단일 메뉴 변경(분식당), 없으면 식당 전체 일괄 변경(학생/교직원 식당)
-                if (menu.getMenuPriceId() > 0) {
-                    return priceController.upsertMenuPriceForSemester(menu);
-                }
-                return priceController.bulkUpdatePricesForSemester(menu);
-            }
+//            case ProtocolCode.ADMIN_PRICE_REGISTER_REQUEST: {
+//                Object data = receivedProtocol.getData();
+//                if (!(data instanceof MenuPriceDTO)) {
+//                    return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
+//                }
+//                MenuPriceDTO menu = (MenuPriceDTO) data;
+//                // menuPriceId가 있으면 단일 메뉴 변경(분식당), 없으면 식당 전체 일괄 변경(학생/교직원 식당)
+//                if (menu.getMenuPriceId() > 0) {
+//                    return priceController.upsertMenuPriceForSemester(menu);
+//                }
+//                return priceController.bulkUpdatePricesForSemester(menu);
+//            }
             default:
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, 0, null);
         }
