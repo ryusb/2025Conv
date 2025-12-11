@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 
 public class Serializer {
@@ -82,11 +83,12 @@ public class Serializer {
 
         if (obj instanceof byte[]) {
             byte[] arr = (byte[]) obj;
-            // 배열 길이(4바이트) + 본문(N바이트) 구조로 리턴
-            ArrayList<Byte> result = new ArrayList<>();
-            addArrList(result, intToByteArray(arr.length));
-            addArrList(result, arr);
-            return byteListToArray(result);
+            byte[] lenBytes = intToByteArray(arr.length);
+            byte[] result = new byte[lenBytes.length + arr.length];
+
+            System.arraycopy(lenBytes, 0, result, 0, lenBytes.length);
+            System.arraycopy(arr, 0, result, lenBytes.length, arr.length);
+            return result;
         }
 
         // 기본 타입 처리
@@ -110,6 +112,9 @@ public class Serializer {
         }
         if (obj instanceof LocalDateTime) {
             return dateToByteArray((LocalDateTime) obj);
+        }
+        if (obj instanceof LocalTime) {
+            return localTimeToByteArray((LocalTime) obj);
         }
 
         Class<?> c = obj.getClass();
@@ -137,19 +142,20 @@ public class Serializer {
                         arr = doubleToByteArray((double) memberVal);
                     } else if (typeStr.equals("boolean") || typeStr.contains("Boolean")) {
                         arr = new byte[] { (byte)((Boolean)memberVal ? 1 : 0) };
-                    } else if (typeStr.contains("[B")) { // [B는 byte[]의 자바 내부 이름입니다.
+                    } else if (typeStr.contains("[B")) {
                         byte[] val = (byte[]) memberVal;
-                        // 길이 + 데이터
-                        ArrayList<Byte> temp = new ArrayList<>();
-                        addArrList(temp, intToByteArray(val.length));
-                        addArrList(temp, val);
-                        arr = byteListToArray(temp);
+                        byte[] lenBytes = intToByteArray(val.length);
+                        arr = new byte[lenBytes.length + val.length];
+
+                        System.arraycopy(lenBytes, 0, arr, 0, lenBytes.length);
+                        System.arraycopy(val, 0, arr, lenBytes.length, val.length);
                     } else if (typeStr.contains("String")) {
                         arr = stringToByteArray((String) memberVal);
                     } else if (typeStr.contains("LocalDateTime")) {
                         arr = dateToByteArray((LocalDateTime) memberVal);
-                    } else {
-                        // DTO 내부의 객체 필드 (재귀 직렬화)
+                    } else if (typeStr.contains("LocalTime")) {
+                        arr = localTimeToByteArray((LocalTime) memberVal);
+                    }  else {
                         arr = getBytes(memberVal);
                         byte[] len = intToByteArray(arr.length);
                         addArrList(result, len);
@@ -159,6 +165,19 @@ public class Serializer {
             }
         }
         return byteListToArray(result);
+    }
+
+    public static byte[] localTimeToByteArray(LocalTime val) {
+        // 시, 분, 초만 저장 (각 4바이트) -> 총 12바이트
+        byte[] hour = intToByteArray(val.getHour());
+        byte[] minute = intToByteArray(val.getMinute());
+        byte[] second = intToByteArray(val.getSecond());
+
+        byte[] result = new byte[12];
+        System.arraycopy(hour, 0, result, 0, 4);
+        System.arraycopy(minute, 0, result, 4, 4);
+        System.arraycopy(second, 0, result, 8, 4);
+        return result;
     }
 
     public static byte[] intToByteArray(int val) {

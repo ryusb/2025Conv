@@ -102,24 +102,39 @@ public class MenuController {
      * 메뉴 이미지 업로드: 파일을 서버에 저장하고 DB의 image_path를 갱신한다.
      */
     public Protocol uploadMenuImage(MenuPriceDTO menuImage) {
+        System.out.println("[DEBUG] 이미지 업로드 요청 도착");
         // 유효성 검사
-        if (menuImage == null || menuImage.getMenuPriceId() <= 0 ||
-                menuImage.getImageBytes() == null || menuImage.getImageBytes().length == 0) {
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
+        if (menuImage == null) {
+            System.out.println("[DEBUG] 실패: DTO가 null입니다.");
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "데이터 없음");
         }
 
-        // 메뉴 존재 여부 확인 (아래 2단계에서 구현할 findById 활용 가능)
+        if (menuImage.getMenuPriceId() <= 0) {
+            System.out.println("[DEBUG] 실패: 메뉴 ID가 유효하지 않음 (" + menuImage.getMenuPriceId() + ")");
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "잘못된 메뉴 ID");
+        }
+
+        if (menuImage.getImageBytes() == null || menuImage.getImageBytes().length == 0) {
+            System.out.println("[DEBUG] 실패: 이미지 바이트가 비어있음");
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "이미지 데이터 없음");
+        }
+
+        System.out.println("[DEBUG] 업로드할 이미지 크기: " + menuImage.getImageBytes().length + " bytes");
+
+        // 메뉴 존재 여부 확인
         if (!menupriceDAO.existsById(menuImage.getMenuPriceId())) {
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "존재하지 않는 메뉴 ID입니다.");
         }
 
         // 파일 시스템 저장 로직 제거 -> DAO 호출하여 DB에 바이트 저장
         boolean dbUpdated = menupriceDAO.updateMenuImagePath(menuImage.getMenuPriceId(), menuImage.getImageBytes());
 
         if (!dbUpdated) {
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
+            System.out.println("[DEBUG] 실패: DAO 업데이트 반환값 false");
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "DB 저장 실패");
         }
 
+        System.out.println("[DEBUG] 이미지 업로드 성공!");
         return new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS,  null);
     }
 

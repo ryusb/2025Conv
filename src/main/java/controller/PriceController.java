@@ -20,14 +20,10 @@ public class PriceController {
      * menuPriceId가 있으면 해당 메뉴 가격을 수정, 없으면 신규 학기 가격을 등록한다.
      */
     public Protocol upsertMenuPriceForSemester(MenuPriceDTO menu) {
-        if (!isValidSingle(menu)) {
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
-        }
-
         boolean success;
         if (menu.getMenuPriceId() > 0) {
             if (!menuPriceDAO.existsById(menu.getMenuPriceId())) {
-                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "존재하지 않는 메뉴");
             }
             success = menuPriceDAO.updateMenuPriceAndSemester(menu);
         } else {
