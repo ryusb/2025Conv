@@ -13,7 +13,6 @@ import network.ProtocolCode;
 import network.ProtocolType;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import persistence.dao.MenuPriceDAO;
 import persistence.dao.PaymentDAO;
 import persistence.dao.UserDAO;
 import persistence.dto.*;

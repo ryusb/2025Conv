@@ -56,20 +56,23 @@ public class CouponPolicyDAO {
 
     // 새로운 쿠폰 정책을 등록 
     public boolean insertPolicy(CouponPolicyDTO policy) {
-        String sql = "INSERT INTO coupon_policy (coupon_price, effective_date) VALUES (?, ?)";
+        String sql = "INSERT INTO coupon_policy (coupon_price, effective_date) VALUES (?, " +
+                (policy.getEffectiveDate() != null ? "?" : "NOW()") + ")";
 
         try (Connection conn = DBConnectionManager.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setInt(1, policy.getCouponPrice());
-            pstmt.setTimestamp(2, Timestamp.valueOf(policy.getEffectiveDate()));
+
+            if (policy.getEffectiveDate() != null) {
+                pstmt.setTimestamp(2, Timestamp.valueOf(policy.getEffectiveDate()));
+            }
 
             int rowsAffected = pstmt.executeUpdate();
             return rowsAffected > 0;
 
         } catch (SQLException e) {
-            System.err.println("CouponPolicyDAO - 정책 등록 중 DB 오류: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("CouponPolicyDAO - 정책 등록 오류: " + e.getMessage());
             return false;
         }
     }

@@ -11,22 +11,20 @@ public class CouponDAO {
     // 1. 사용자에게 새로운 쿠폰을 대량 삽입합니다. (쿠폰 구매)
     // List<CouponDTO>는 DB에 삽입할 쿠폰 정보를 담고 있습니다.
     public boolean insertCoupons(List<CouponDTO> coupons) {
-        // user_id, purchase_date, purchase_value, is_used (false)
-        String sql = "INSERT INTO coupon (user_id, purchase_date, purchase_value, is_used) VALUES (?, ?, ?, FALSE)";
+        String sql = "INSERT INTO coupon (user_id, purchase_date, purchase_value, is_used) VALUES (?, NOW(), ?, FALSE)";
         Connection conn = null;
         PreparedStatement pstmt = null;
         boolean success = true;
 
         try {
             conn = DBConnectionManager.getConnection();
-            conn.setAutoCommit(false); // 트랜잭션 시작 (대량 삽입 시 효율적)
+            conn.setAutoCommit(false);
             pstmt = conn.prepareStatement(sql);
 
             for (CouponDTO coupon : coupons) {
                 pstmt.setInt(1, coupon.getUserId());
-                pstmt.setTimestamp(2, Timestamp.valueOf(coupon.getPurchaseDate()));
-                pstmt.setInt(3, coupon.getPurchaseValue());
-                pstmt.addBatch(); // 일괄 처리 목록에 추가
+                pstmt.setInt(2, coupon.getPurchaseValue());
+                pstmt.addBatch();
             }
 
             pstmt.executeBatch(); // 일괄 실행
