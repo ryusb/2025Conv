@@ -241,7 +241,7 @@ public class PaymentDAO {
             String lower = trimmed.toLowerCase();
             switch (lower) {
                 case "stdcafeteria":
-                case "stuCafeteria":
+                case "stucafeteria":
                 case "학생식당":
                     return "학생식당";
                 case "faccafeteria":
@@ -251,7 +251,13 @@ public class PaymentDAO {
                 case "분식당":
                     return "분식당";
                 default:
-                    return trimmed;
+                    // ID가 확실하면 한글 표기로 강제 반환
+                    switch (restaurantId) {
+                        case 1: return "학생식당";
+                        case 2: return "교직원식당";
+                        case 3: return "분식당";
+                        default: return trimmed;
+                    }
             }
         }
 
