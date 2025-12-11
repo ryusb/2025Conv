@@ -70,7 +70,7 @@ public class ClientHandler extends Thread {
         } finally {
             if (this.loginUser != null) {
                 SessionManager.removeSession(this.loginUser.getLoginId());
-                System.out.println("로그아웃 처리됨: " + this.loginUser.getLoginId());
+                System.out.println("세션 종료(로그아웃): " + this.loginUser.getLoginId());
             }
 
             try {
@@ -120,8 +120,8 @@ public class ClientHandler extends Thread {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
         }
 
-        // [추가] 권한 체크 로직 (관리자 기능 접근 제어)
-        // ProtocolCode 0x10 ~ 0x29 범위는 관리자 전용이라고 가정
+        // 권한 체크 로직 (관리자 기능 접근 제어)
+        // ProtocolCode 0x10 ~ 0x29 범위는 관리자 전용
         if (req.getCode() >= 0x10 && req.getCode() <= 0x29) {
             if (this.loginUser == null || !"admin".equals(this.loginUser.getUserType())) {
                 // 0x55: PERMISSION_DENIED 반환
@@ -137,20 +137,24 @@ public class ClientHandler extends Thread {
                 case ProtocolCode.LOGIN_REQUEST: { // 0x02
                     UserDTO u = (UserDTO) req.getData();
                     // 1. 중복 로그인 체크
-                    if (SessionManager.isLoggedIn(u.getLoginId())) {
+                    ClientHandler activeSession = SessionManager.getSession(u.getLoginId());
+                    // 이미 접속중인데, 그게 '나(this)'가 아니라면 다른 기기 접속임 -> 차단
+                    if (activeSession != null && activeSession != this) {
                         return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "이미 접속 중인 아이디입니다.");
                     }
                     // 2. DB 인증
                     UserDTO result = userDAO.findUserByLoginId(u.getLoginId(), u.getPassword());
                     if (result != null) {
-                        // [추가됨] 3. 세션 매니저에 등록
-                        // 동시성 이슈 방지를 위해 addSession의 리턴값으로 한 번 더 체크
-                        if (SessionManager.addSession(result.getLoginId(), this)) {
-                            this.loginUser = result; // 현재 핸들러에 유저 정보 저장
-                            return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, result);
-                        } else {
-                            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "이미 접속 중인 아이디입니다.");
+                        // 3. 세션 등록 (기존 로그인 정보가 있다면 갱신)
+                        if (this.loginUser != null) {
+                            // 같은 소켓에서 다른 아이디로 로그인 시도 시 이전 아이디 제거
+                            SessionManager.removeSession(this.loginUser.getLoginId());
                         }
+
+                        SessionManager.addSession(result.getLoginId(), this);
+                        this.loginUser = result;
+
+                        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, result);
                     } else {
                         return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, null);
                     }
