@@ -68,6 +68,11 @@ public class ClientHandler extends Thread {
             System.err.println("클라이언트 핸들러 오류: " + e.getMessage());
             e.printStackTrace();
         } finally {
+            if (this.loginUser != null) {
+                SessionManager.removeSession(this.loginUser.getLoginId());
+                System.out.println("로그아웃 처리됨: " + this.loginUser.getLoginId());
+            }
+
             try {
                 if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
             } catch (IOException e) {}
@@ -131,13 +136,22 @@ public class ClientHandler extends Thread {
                 // ==========================================
                 case ProtocolCode.LOGIN_REQUEST: { // 0x02
                     UserDTO u = (UserDTO) req.getData();
+                    // 1. 중복 로그인 체크
+                    if (SessionManager.isLoggedIn(u.getLoginId())) {
+                        return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "이미 접속 중인 아이디입니다.");
+                    }
+                    // 2. DB 인증
                     UserDTO result = userDAO.findUserByLoginId(u.getLoginId(), u.getPassword());
                     if (result != null) {
-                        // 성공 시 LOGIN_RESPONSE (0x30) + 유저 데이터 반환
-                        loginUser = result;
-                        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, result);
+                        // [추가됨] 3. 세션 매니저에 등록
+                        // 동시성 이슈 방지를 위해 addSession의 리턴값으로 한 번 더 체크
+                        if (SessionManager.addSession(result.getLoginId(), this)) {
+                            this.loginUser = result; // 현재 핸들러에 유저 정보 저장
+                            return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, result);
+                        } else {
+                            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "이미 접속 중인 아이디입니다.");
+                        }
                     } else {
-                        // 실패 시 INVALID_INPUT (0x52) 반환
                         return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, null);
                     }
                 }
