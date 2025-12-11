@@ -98,4 +98,9 @@ public class CouponController {
         }
         return policy.getCouponPrice() > 0;
     }
+
+    public Protocol getCouponPurchaseHistory(int userId) {
+        List<CouponDTO> list = couponDAO.findAllCouponsByUserId(userId);
+        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.COUPON_PURCHASE_HISTORY_RESPONSE, list);
+    }
 }

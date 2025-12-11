@@ -34,23 +34,68 @@ public class MenuController {
      * menuPriceId가 0이하면 신규 등록, 그 이상이면 수정으로 처리.
      */
     public Protocol registerOrUpdateMenu(MenuPriceDTO menu) {
-        if (!isValid(menu)) {
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL,  null);
+        if (menu == null) {
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "데이터가 없습니다.");
         }
 
-        boolean success;
+        // 1. 수정 요청 (ID가 있음)
         if (menu.getMenuPriceId() > 0) {
+            // 수정용 유효성 검사 (이름, 가격만 체크)
+            if (!isValidForUpdate(menu)) {
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "메뉴명 또는 가격 정보가 누락되었습니다.");
+            }
+
             if (!menupriceDAO.existsById(menu.getMenuPriceId())) {
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "존재하지 않는 메뉴 ID입니다.");
+            }
+
+            boolean success = menupriceDAO.updateMenu(menu);
+            return success
+                    ? new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, null)
+                    : new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "메뉴 수정 실패");
+        }
+        // 2. 신규 등록 요청
+        else {
+            // 등록용 유효성 검사 (전체 필드 체크)
+            if (!isValid(menu)) {
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
             }
-            success = menupriceDAO.updateMenu(menu);
-        } else {
-            success = menupriceDAO.insertMenu(menu);
+            boolean success = menupriceDAO.insertMenu(menu);
+            return success
+                    ? new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, null)
+                    : new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
         }
+    }
 
-        return success
-                ? new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, null)
-                : new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
+    // 수정 시 필요한 필드만 검사
+    private boolean isValidForUpdate(MenuPriceDTO menu) {
+        if (menu.getMenuPriceId() <= 0) return false;
+        if (menu.getMenuName() == null || menu.getMenuName().trim().isEmpty()) return false;
+        if (menu.getPriceStu() < 0 || menu.getPriceFac() < 0) return false;
+        return true;
+    }
+
+    // 등록 시 모든 필드 검사
+    private boolean isValid(MenuPriceDTO menu) {
+        if (menu == null) {
+            return false;
+        }
+        if (menu.getRestaurantId() <= 0) {
+            return false;
+        }
+        if (menu.getMenuName() == null || menu.getMenuName().trim().isEmpty()) {
+            return false;
+        }
+        if (menu.getMealTime() == null || menu.getMealTime().trim().isEmpty()) {
+            return false;
+        }
+        if (menu.getSemesterName() == null || menu.getSemesterName().trim().isEmpty()) {
+            return false;
+        }
+        if (menu.getPriceStu() < 0 || menu.getPriceFac() < 0) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -120,28 +165,6 @@ public class MenuController {
             return "";
         }
         return ext;
-    }
-
-    private boolean isValid(MenuPriceDTO menu) {
-        if (menu == null) {
-            return false;
-        }
-        if (menu.getRestaurantId() <= 0) {
-            return false;
-        }
-        if (menu.getMenuName() == null || menu.getMenuName().trim().isEmpty()) {
-            return false;
-        }
-        if (menu.getMealTime() == null || menu.getMealTime().trim().isEmpty()) {
-            return false;
-        }
-        if (menu.getSemesterName() == null || menu.getSemesterName().trim().isEmpty()) {
-            return false;
-        }
-        if (menu.getPriceStu() < 0 || menu.getPriceFac() < 0) {
-            return false;
-        }
-        return true;
     }
 
     public byte[] getCsvSample() {

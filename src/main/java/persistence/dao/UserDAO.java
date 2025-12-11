@@ -12,10 +12,10 @@ public class UserDAO {
         UserDTO user = null;
 
         try (Connection conn = DBConnectionManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, loginId);
-            // ⚠️ 실제 환경에서는 password는 반드시 암호화(해시)되어야 합니다. //응 안해
+            // TODO: 해시화
             pstmt.setString(2, password);
 
             try (ResultSet rs = pstmt.executeQuery()) {

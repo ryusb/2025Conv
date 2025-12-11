@@ -70,5 +70,4 @@ public class Client {
 
         return new Protocol(packet);
     }
-
 }
