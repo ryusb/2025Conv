@@ -15,21 +15,35 @@ public class Deserializer {
     final static int DOUBLE_LENGTH = 8;
 
     public static Object getObject(byte[] objInfo) throws Exception {
-        if (objInfo.length < INT_LENGTH) {
+        if (objInfo == null || objInfo.length < INT_LENGTH) {
             return null;
         }
 
-        int idx = INT_LENGTH;
+        int idx = INT_LENGTH; // 시작 오프셋 (보통 헤더 이후)
 
-        /* find class */
-        String name;
+        /* 1. 클래스 이름 길이 읽기 */
+        // [방어 코드] 남은 데이터가 INT_LENGTH(4바이트)보다 적으면 읽을 수 없음
+        if (idx + INT_LENGTH > objInfo.length) {
+            throw new Exception("[Deserializer] 데이터 부족: 클래스 이름 길이를 읽을 수 없습니다.");
+        }
+
         byte[] lengthByteArray = new byte[INT_LENGTH];
-        System.arraycopy(objInfo, idx, lengthByteArray, 0, INT_LENGTH); idx += INT_LENGTH;
+        System.arraycopy(objInfo, idx, lengthByteArray, 0, INT_LENGTH);
+        idx += INT_LENGTH;
         int length = byteArrayToInt(lengthByteArray);
 
+        /* 2. 유효성 검사 (핵심 수정 부분) */
+        // 읽어온 길이가 음수이거나, 남은 데이터보다 길다면 에러 처리
+        if (length < 0 || idx + length > objInfo.length) {
+            throw new Exception("[Deserializer] 잘못된 데이터 패킷: " +
+                    "클래스 이름 길이(" + length + ")가 남은 데이터(" + (objInfo.length - idx) + ")보다 큽니다.");
+        }
+
+        /* 3. 클래스 이름 읽기 */
         byte[] stringByteArray = new byte[length];
-        System.arraycopy(objInfo, idx, stringByteArray,  0, length); idx += length;
-        name = new String(stringByteArray);
+        System.arraycopy(objInfo, idx, stringByteArray, 0, length);
+        idx += length;
+        String name = new String(stringByteArray);
 
         Class<?> c = Class.forName(name);
         idx = checkVersion(c, objInfo, idx);
