@@ -183,32 +183,33 @@ public class PaymentDAO {
 // ---------------------------------------------------
 // 식당별 운영 시간대 매핑 함수
 // ---------------------------------------------------
-    private String getMealTimeSlot(int restaurantId, String restaurantName, String mealTime, int hourSlot) {
-        String key = normalizeRestaurantKey(restaurantId, restaurantName);
-        String mt = mealTime == null ? "" : mealTime.trim().toLowerCase();
+private String getMealTimeSlot(int restaurantId, String restaurantName, String mealTime, int hourSlot) {
+    String key = normalizeRestaurantKey(restaurantId, restaurantName);
+    String mt = (mealTime == null ? "" : mealTime.trim().toLowerCase());
 
-        switch (key) {
-            case "stdCafeteria": // opt1 아침, opt2 점심
-                if (mt.equals("opt1")) return "아침";
-                if (mt.equals("opt2")) return "점심";
-                break; // opt0/미정은 시간 기반으로 처리
+    switch (key) {
+        case "stdCafeteria": // 학생식당
+            if (mt.equals("opt1")) return "아침";
+            if (mt.equals("opt2")) return "점심";
+            // 학생식당은 opt0 사용 금지 -> 무시 (null 리턴)
+            return null;
 
-            case "facCafeteria": // opt1 점심, opt2 저녁
-                if (mt.equals("opt1")) return "점심";
-                if (mt.equals("opt2")) return "저녁";
-                break; // opt0/미정은 시간 기반으로 처리
+        case "facCafeteria": // 교직원식당
+            if (mt.equals("opt1")) return "점심";
+            if (mt.equals("opt2")) return "저녁";
+            // 교직원식당은 opt0 사용 금지 -> 무시 (null 리턴)
+            return null;
 
-            case "snack": // opt0 상시
-                // 분식당은 주문 시간 기준으로 시간대 표시 (예: 12시)
-                return String.format("%02d시", hourSlot);
+        case "snack": // 분식당만 시간 기반 허용
+            return String.format("%02d시", hourSlot);
 
-            default:
-                break;
-        }
-
-        // 시간 정보를 사용한 기본 슬롯 (식당/mealTime 정보가 없거나 opt0인 경우)
-        return String.format("%02d시", hourSlot);
+        default:
+            break;
     }
+
+    return null;
+}
+
 
     private String normalizeRestaurantKey(int restaurantId, String restaurantName) {
         String name = (restaurantName == null) ? "" : restaurantName.trim().toLowerCase();
