@@ -3,10 +3,7 @@ package persistence.dao;
 import persistence.dto.PaymentDTO;
 import java.sql.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import network.DBConnectionManager;
 
@@ -133,11 +130,12 @@ public class PaymentDAO {
     // 시간대별 이용률 통계 (시간대별 결제 건수)
     // 반환 예시: "12시: 학생식당 (15건)", "12시: 교직원식당 (8건)"
     public List<String> getTimeSlotUsageStats() {
-        List<String> result = new ArrayList<>();
-        String sql = "SELECT HOUR(payment_time) as hour_slot, restaurant_name, COUNT(*) as usage_count "
-                + "FROM payment WHERE status = '성공' "
-                + "GROUP BY hour_slot, restaurant_name "
-                + "ORDER BY hour_slot, restaurant_name";
+
+        String sql = "SELECT HOUR(payment_time) AS hour_slot, restaurant_name " +
+                "FROM payment WHERE status='성공'";
+
+        // 식당별 → 시간대별 집계 Map
+        Map<String, Map<String, Integer>> stats = new LinkedHashMap<>();
 
         try (Connection conn = DBConnectionManager.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
@@ -145,16 +143,65 @@ public class PaymentDAO {
 
             while (rs.next()) {
                 int hour = rs.getInt("hour_slot");
-                String name = rs.getString("restaurant_name");
-                int count = rs.getInt("usage_count");
+                String restaurant = rs.getString("restaurant_name");
 
-                result.add(String.format("%02d시: %s (%d건)", hour, name, count));
+                // 시간대 구하기
+                String timeSlot = getMealTimeSlot(restaurant, hour);
+                if (timeSlot == null) continue; // 해당 식당에 해당되지 않는 시간대는 skip
+
+                // 집계
+                stats
+                        .computeIfAbsent(restaurant, k -> new LinkedHashMap<>())
+                        .merge(timeSlot, 1, Integer::sum);
             }
+
         } catch (SQLException e) {
             System.err.println("PaymentDAO - 시간대 통계 오류: " + e.getMessage());
         }
+
+        // 출력 형태 구성
+        List<String> result = new ArrayList<>();
+        for (String restaurant : stats.keySet()) {
+            result.add("[" + restaurant + "]");
+            Map<String, Integer> slotMap = stats.get(restaurant);
+
+            for (String slot : slotMap.keySet()) {
+                int count = slotMap.get(slot);
+                result.add(String.format("%s: %d건", slot, count));
+            }
+            result.add("");
+        }
+
         return result;
     }
+
+
+    // ---------------------------------------------------
+// 식당별 운영 시간대 매핑 함수
+// ---------------------------------------------------
+    private String getMealTimeSlot(String restaurant, int hour) {
+
+        switch (restaurant) {
+
+            case "stdCafeteria": // 학생식당
+                if (hour >= 8 && hour < 10) return "아침";
+                if (hour >= 11 && hour < 13) return "점심";
+                return null;
+
+            case "facCafeteria": // 교직원식당
+                if (hour >= 11 && hour < 13) return "점심";
+                if (hour >= 17 && hour < 18) return "저녁";
+                return null;
+
+            case "snack": // 분식당
+                if (hour >= 11 && hour < 14) return "점심";
+                if (hour >= 16 && hour < 18) return "저녁";
+                return null;
+        }
+
+        return null;
+    }
+
 
     // 람다식 사용을 위한 함수형 인터페이스
     @FunctionalInterface
