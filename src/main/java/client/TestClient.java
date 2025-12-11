@@ -323,6 +323,47 @@ public class TestClient {
         }
     }
 
+    // [헬퍼] 식당 목록을 서버에서 받아와서 선택하게 하는 메서드
+    private static RestaurantDTO selectRestaurant() throws IOException {
+        // 1. 식당 목록 요청
+        send(new Protocol(ProtocolType.REQUEST, ProtocolCode.RESTAURANT_LIST_REQUEST, null));
+        Protocol res = receive();
+
+        if (res.getCode() == ProtocolCode.RESTAURANT_LIST_RESPONSE) {
+            List<RestaurantDTO> list = (List<RestaurantDTO>) res.getData();
+            System.out.println("\n--- [식당 선택] ---");
+            for (RestaurantDTO r : list) {
+                System.out.printf("[%d] %s\n", r.getRestaurantId(), r.getName());
+                System.out.printf("    운영시간1: %s ~ %s\n", r.getOpenTime1(), r.getCloseTime1());
+                System.out.printf("    운영시간2: %s ~ %s\n", r.getOpenTime2(), r.getCloseTime2());
+            }
+            System.out.print("식당 ID 선택>> ");
+            int id = getIntInput();
+            return list.stream().filter(r -> r.getRestaurantId() == id).findFirst().orElse(null);
+        } else {
+            System.out.println("❌ 식당 목록 조회 실패");
+            return null;
+        }
+    }
+
+    // [헬퍼] 식당 타입에 따라 시간대 선택 ("상시" or "1/2")
+    private static String selectMealTime(RestaurantDTO r) {
+        // 분식당(snack)인 경우 (이름으로 판단하거나 ID로 판단)
+        if (r.getName().contains("snack") || r.getName().contains("분식")) {
+            System.out.println(">> '상시' 운영 식당입니다.");
+            return "상시";
+        }
+        // 일반 식당인 경우
+        else {
+            System.out.println("--- [시간대 선택] ---");
+            System.out.println(" 1. 운영시간1 (" + r.getOpenTime1() + " ~ " + r.getCloseTime1() + ")");
+            System.out.println(" 2. 운영시간2 (" + r.getOpenTime2() + " ~ " + r.getCloseTime2() + ")");
+            System.out.print("선택>> ");
+            int c = getIntInput();
+            return c == 1 ? "운영시간1" : "운영시간2";
+        }
+    }
+
     // --- 사용자 기능 ---
     // 0x03: 메뉴 목록 조회
     private static void testMenuList() throws IOException {
@@ -391,15 +432,51 @@ public class TestClient {
 
     // 0x07, 0x08: 결제 (카드/쿠폰)
     private static void testPayment(byte code) throws IOException {
-        System.out.println(code == ProtocolCode.PAYMENT_CARD_REQUEST ? "[카드 결제]" : "[쿠폰 결제]");
+        System.out.println(code == ProtocolCode.PAYMENT_CARD_REQUEST ? "\n[카드 결제]" : "\n[쿠폰 결제]");
+
+        // 1. 식당 및 메뉴 선택
+        RestaurantDTO r = selectRestaurant(); // 식당 목록 보여주고 선택
+        if (r == null) return;
+
+        MenuPriceDTO menuInfo = findMenuInfo(r.getRestaurantId()); // 해당 식당 메뉴 목록에서 선택
+        if (menuInfo == null) return;
+
+        int price = currentUser.getUserType().equals("교직원") ? menuInfo.getPriceFac() : menuInfo.getPriceStu();
+        System.out.println(">> 선택 메뉴: " + menuInfo.getMenuName());
+        System.out.println(">> 결제 금액: " + price + "원");
+
+        // 2. 결제 요청 준비
         PaymentDTO pay = new PaymentDTO();
         pay.setUserId(currentUser.getUserId());
         pay.setUserType(currentUser.getUserType());
-        System.out.print("메뉴 ID: "); pay.setMenuPriceId(getIntInput());
+        pay.setMenuPriceId(menuInfo.getMenuPriceId());
+
+        // 3. 쿠폰 처리
+        int couponValue = 0;
         if (code == ProtocolCode.PAYMENT_COUPON_REQUEST) {
-            System.out.print("사용할 쿠폰 ID: "); pay.setUsedCouponId(getIntInput());
+            System.out.print("쿠폰 ID 입력: ");
+            int cId = getIntInput();
+            pay.setUsedCouponId(cId);
+            couponValue = findCouponValue(cId);
+            if(couponValue < 0) {
+                System.out.println("❌ 유효하지 않은 쿠폰");
+                return;
+            }
+            System.out.println(">> 쿠폰 차감: -" + couponValue + "원");
         }
 
+        // 4. 최종 확인
+        int extra = (price > couponValue) ? price - couponValue : 0;
+        System.out.println("--------------------------------");
+        System.out.println(" 최종 카드 결제액: " + extra + "원");
+        System.out.println("--------------------------------");
+        System.out.print("결제하시겠습니까? (Y/N): ");
+        if (!sc.nextLine().equalsIgnoreCase("Y")) {
+            System.out.println("🚫 취소됨");
+            return;
+        }
+
+        // 5. 사용자 승인 후 실제 요청 전송
         send(new Protocol(ProtocolType.REQUEST, code, pay));
         Protocol res = receive();
 
@@ -407,14 +484,67 @@ public class TestClient {
             System.out.println("✅ 결제 성공!");
             if (res.getData() instanceof PaymentDTO) {
                 PaymentDTO result = (PaymentDTO) res.getData();
+                System.out.println("   [영수증]");
+                System.out.println("   ★ 주문번호: " + result.getPaymentId());
+                System.out.println("   - 메뉴: " + result.getMenuName());
                 System.out.println("   - 상태: " + result.getStatus());
-                System.out.println("   - 메뉴 가격: " + result.getMenuPriceAtTime() + "원");
-                System.out.println("   - 쿠폰 사용: " + result.getCouponValueUsed() + "원");
-                System.out.println("   - 추가 결제: " + result.getAdditionalCardAmount() + "원");
+                System.out.println("   - 총액: " + result.getMenuPriceAtTime() + "원");
+                if (result.getCouponValueUsed() > 0)
+                    System.out.println("   - 쿠폰: -" + result.getCouponValueUsed() + "원");
+                System.out.println("   - 카드: " + result.getAdditionalCardAmount() + "원");
+                System.out.println("   - 시간: " + result.getPaymentTime());
             }
         } else {
             printFail(res);
         }
+    }
+
+    private static MenuPriceDTO findMenuInfo(int restaurantId) throws IOException {
+        // 시간대는 테스트 편의상 '점심'으로 고정하거나 사용자에게 입력받을 수 있음.
+        // 여기서는 편의상 사용자가 입력하도록 함
+        System.out.println("시간대 선택 (1:운영시간1, 2:운영시간2, 0:상시): ");
+        int t = getIntInput();
+        String time = (t == 1) ? "운영시간1" : (t == 2) ? "운영시간2" : "상시";
+
+        MenuPriceDTO req = new MenuPriceDTO();
+        req.setRestaurantId(restaurantId);
+        req.setMealTime(time);
+
+        send(new Protocol(ProtocolType.REQUEST, ProtocolCode.MENU_LIST_REQUEST, req));
+        Protocol res = receive();
+
+        if (res.getCode() == ProtocolCode.MENU_LIST_RESPONSE) {
+            List<MenuPriceDTO> list = (List<MenuPriceDTO>) res.getData();
+            if (list.isEmpty()) {
+                System.out.println("❌ 해당 조건의 메뉴가 없습니다.");
+                return null;
+            }
+            System.out.println("--- [판매 중인 메뉴] ---");
+            for (MenuPriceDTO m : list) {
+                System.out.printf("[%d] %s (%d원)\n", m.getMenuPriceId(), m.getMenuName(),
+                        currentUser.getUserType().equals("교직원") ? m.getPriceFac() : m.getPriceStu());
+            }
+            System.out.print("메뉴 ID 선택: ");
+            int selectedId = getIntInput();
+            return list.stream().filter(m -> m.getMenuPriceId() == selectedId).findFirst().orElse(null);
+        }
+        return null;
+    }
+
+    // [헬퍼] 쿠폰 가치를 찾기 위해 목록을 조회하는 메서드
+    private static int findCouponValue(int couponId) throws IOException {
+        send(new Protocol(ProtocolType.REQUEST, ProtocolCode.COUPON_LIST_REQUEST, currentUser.getUserId()));
+        Protocol res = receive();
+
+        if (res.getCode() == ProtocolCode.COUPON_LIST_RESPONSE) {
+            List<CouponDTO> list = (List<CouponDTO>) res.getData();
+            for (CouponDTO c : list) {
+                if (c.getCouponId() == couponId) {
+                    return c.getPurchaseValue();
+                }
+            }
+        }
+        return -1; // 쿠폰 없음 or 내 거 아님
     }
 
     // 0x09: 이용 내역 조회
@@ -449,27 +579,31 @@ public class TestClient {
 
     // 0x10: 메뉴 등록
     private static void testMenuInsert() throws IOException {
-        System.out.println("\n[관리자: 메뉴 등록]");
+        System.out.println("[메뉴 등록]");
+        RestaurantDTO r = selectRestaurant();
+        if(r == null) return;
+
         MenuPriceDTO m = new MenuPriceDTO();
-        System.out.print("식당 ID: "); m.setRestaurantId(getIntInput());
-        System.out.print("식당 이름: "); m.setRestaurantName(sc.nextLine());
+        m.setRestaurantId(r.getRestaurantId());
+        m.setRestaurantName(r.getName()); // 이름도 세팅 권장
+
         System.out.print("메뉴명: "); m.setMenuName(sc.nextLine());
-        System.out.print("시간대(아침/점심/저녁/상시): "); m.setMealTime(sc.nextLine());
+
+        // 시간대 선택 (분식이면 자동 상시, 아니면 선택)
+        String time = selectMealTime(r);
+        m.setMealTime(time);
+
         System.out.print("학기명: "); m.setSemesterName(sc.nextLine());
         m.setCurrentSemester(true);
         System.out.print("학생가: "); m.setPriceStu(getIntInput());
-        System.out.print("교직원가: "); m.setPriceFac(getIntInput());
-        System.out.print("날짜 (YYYY-MM-DD): ");
-        String dateStr = sc.nextLine();
-        try {
-            // ISO_LOCAL_DATE 형식 (yyyy-MM-dd) 파싱
-            LocalDate date = LocalDate.parse(dateStr);
-            m.setDate(date.atStartOfDay());
-        } catch (Exception e) {
-            System.out.println("⚠️ 날짜 형식이 올바르지 않아 현재 날짜로 설정합니다. (입력값: " + dateStr + ")");
-            m.setDate(LocalDateTime.now());
-        }
+        System.out.print("직원가: "); m.setPriceFac(getIntInput());
 
+        System.out.print("날짜(YYYY-MM-DD, 없으면 엔터): ");
+        String d = sc.nextLine();
+        if(!d.isBlank()) {
+            try { m.setDate(LocalDate.parse(d).atStartOfDay()); }
+            catch(Exception e){ System.out.println("날짜 오류"); return; }
+        }
         send(new Protocol(ProtocolType.REQUEST, ProtocolCode.MENU_INSERT_REQUEST, m));
         printSimpleResult(receive());
     }
