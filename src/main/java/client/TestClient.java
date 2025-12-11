@@ -351,7 +351,7 @@ public class TestClient {
         // 이름에 'snack'이나 '분식'이 포함되면 상시 운영으로 간주
         if (r.getName().toLowerCase().contains("snack") || r.getName().contains("분식")) {
             System.out.println(">> '상시' 운영 식당입니다.");
-            return "상시";
+            return "opt0";
         }
         // 그 외(학생, 교직원)는 시간 선택
         else {
@@ -360,8 +360,8 @@ public class TestClient {
             System.out.println(" 2. 운영시간2 (" + r.getOpenTime2() + " ~ " + r.getCloseTime2() + ")");
             System.out.print("선택>> ");
             int c = getIntInput();
-            if (c == 1) return "운영시간1";
-            if (c == 2) return "운영시간2";
+            if (c == 1) return "opt1";
+            if (c == 2) return "opt2";
             return ""; // 잘못된 선택
         }
     }
