@@ -131,8 +131,9 @@ public class PaymentDAO {
     // 반환 예시: "12시: 학생식당 (15건)", "12시: 교직원식당 (8건)"
     public List<String> getTimeSlotUsageStats() {
 
-        String sql = "SELECT HOUR(payment_time) AS hour_slot, restaurant_id, restaurant_name " +
-                "FROM payment WHERE status <> '실패'";
+        String sql = "SELECT HOUR(p.payment_time) AS hour_slot, p.restaurant_id, p.restaurant_name, mp.meal_time " +
+                "FROM payment p " +
+                "LEFT JOIN menu_price mp ON p.menu_price_id = mp.menu_price_id";
 
         // 식당별 → 시간대별 집계 Map
         Map<String, Map<String, Integer>> stats = new LinkedHashMap<>();
@@ -142,16 +143,14 @@ public class PaymentDAO {
              ResultSet rs = pstmt.executeQuery()) {
 
             while (rs.next()) {
-                int hour = rs.getInt("hour_slot");
                 int restaurantId = rs.getInt("restaurant_id");
                 String restaurant = rs.getString("restaurant_name");
+                String mealTime = rs.getString("meal_time");
+                int hourSlot = rs.getInt("hour_slot");
 
                 // 시간대 구하기
-                String timeSlot = getMealTimeSlot(restaurantId, restaurant, hour);
-                if (timeSlot == null) {
-                    // 운영 시간대 매핑에 없으면 시간 단위로라도 묶어서 보여줌
-                    timeSlot = String.format("%02d시", hour);
-                }
+                String timeSlot = getMealTimeSlot(restaurantId, restaurant, mealTime, hourSlot);
+                if (timeSlot == null) continue; // 운영 시간 밖 데이터는 통계 제외
 
                 // 집계
                 String displayName = canonicalizeRestaurantName(restaurantId, restaurant);
@@ -181,32 +180,36 @@ public class PaymentDAO {
     }
 
 
-    // ---------------------------------------------------
+// ---------------------------------------------------
 // 식당별 운영 시간대 매핑 함수
 // ---------------------------------------------------
-    private String getMealTimeSlot(int restaurantId, String restaurantName, int hour) {
-        String key = normalizeRestaurantKey(restaurantId, restaurantName);
+private String getMealTimeSlot(int restaurantId, String restaurantName, String mealTime, int hourSlot) {
+    String key = normalizeRestaurantKey(restaurantId, restaurantName);
+    String mt = (mealTime == null ? "" : mealTime.trim().toLowerCase());
 
-        switch (key) {
-            case "stdCafeteria": // 학생식당
-                if (hour >= 8 && hour < 10) return "아침";
-                if (hour >= 11 && hour < 13) return "점심";
-                return null;
+    switch (key) {
+        case "stdCafeteria": // 학생식당
+            if (mt.equals("opt1")) return "아침";
+            if (mt.equals("opt2")) return "점심";
+            // 학생식당은 opt0 사용 금지 -> 무시 (null 리턴)
+            return null;
 
-            case "facCafeteria": // 교직원식당
-                if (hour >= 11 && hour < 13) return "점심";
-                if (hour >= 17 && hour < 18) return "저녁";
-                return null;
+        case "facCafeteria": // 교직원식당
+            if (mt.equals("opt1")) return "점심";
+            if (mt.equals("opt2")) return "저녁";
+            // 교직원식당은 opt0 사용 금지 -> 무시 (null 리턴)
+            return null;
 
-            case "snack": // 분식당
-                if (hour >= 11 && hour < 14) return "점심";
-                if (hour >= 16 && hour < 18) return "저녁";
-                return null;
+        case "snack": // 분식당만 시간 기반 허용
+            return String.format("%02d시", hourSlot);
 
-            default:
-                return null;
-        }
+        default:
+            break;
     }
+
+    return null;
+}
+
 
     private String normalizeRestaurantKey(int restaurantId, String restaurantName) {
         String name = (restaurantName == null) ? "" : restaurantName.trim().toLowerCase();
@@ -222,9 +225,11 @@ public class PaymentDAO {
         // 이름 기반 보정 (대소문자/한글 호환)
         switch (name) {
             case "stdcafeteria":
+            case "stucafeteria":
             case "학생식당":
                 return "stdCafeteria";
             case "faccafeteria":
+            case "feccafeteria":
             case "교직원식당":
                 return "facCafeteria";
             case "snack":
@@ -241,6 +246,7 @@ public class PaymentDAO {
             String lower = trimmed.toLowerCase();
             switch (lower) {
                 case "stdcafeteria":
+                case "stucafeteria":
                 case "학생식당":
                     return "학생식당";
                 case "faccafeteria":
@@ -250,7 +256,13 @@ public class PaymentDAO {
                 case "분식당":
                     return "분식당";
                 default:
-                    return trimmed;
+                    // ID가 확실하면 한글 표기로 강제 반환
+                    switch (restaurantId) {
+                        case 1: return "학생식당";
+                        case 2: return "교직원식당";
+                        case 3: return "분식당";
+                        default: return trimmed;
+                    }
             }
         }
 
