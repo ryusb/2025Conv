@@ -194,6 +194,11 @@ public class ClientHandler extends Thread {
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.USAGE_HISTORY_RESPONSE,  history);
                 }
 
+                case ProtocolCode.COUPON_PURCHASE_HISTORY_REQUEST: { // 0x0A
+                    int userId = (int) req.getData();
+                    return couponController.getCouponPurchaseHistory(userId);
+                }
+
                 // ==========================================
                 // II. 관리자 - 메뉴/가격 관리
                 // ==========================================

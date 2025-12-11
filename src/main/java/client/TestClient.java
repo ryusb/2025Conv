@@ -77,33 +77,26 @@ public class TestClient {
     // [메뉴 핸들링 로직]
     // ===============================================================
 
-    /**
-     * 일반 사용자용 메인 메뉴
-     */
+    // ===============================================================
+    // [사용자 전용 메뉴 핸들링]
+    // ===============================================================
+
     private static void handleUserMenu() {
         while (currentUser != null) {
-            System.out.println("\n================ [사용자 메뉴] ================");
-            System.out.println(" 1. 메뉴 목록 조회      2. 메뉴 이미지 다운로드");
-            System.out.println(" 3. 내 쿠폰 조회        4. 쿠폰 구매");
-            System.out.println(" 5. 카드 결제           6. 쿠폰 결제");
-            System.out.println(" 7. 이용 내역 조회");
+            System.out.println("\n================ [사용자 메인] ================");
+            System.out.println(" 1. 주문 하기 (메뉴/결제)");
+            System.out.println(" 2. 쿠폰 관리");
+            System.out.println(" 3. 이용 내역 조회");
             System.out.println(" 0. 로그아웃");
             System.out.print("선택>> ");
 
             int choice = getIntInput();
             try {
                 switch (choice) {
-                    case 1: testMenuList(); break;
-                    case 2: testMenuImageDownload(); break;
-                    case 3: testCouponList(); break;
-                    case 4: testCouponPurchase(); break;
-                    case 5: testPayment(ProtocolCode.PAYMENT_CARD_REQUEST); break;
-                    case 6: testPayment(ProtocolCode.PAYMENT_COUPON_REQUEST); break;
-                    case 7: testUsageHistory(); break;
-                    case 0:
-                        System.out.println("로그아웃 되었습니다.");
-                        currentUser = null;
-                        return;
+                    case 1: handleUserOrderMenu(); break;
+                    case 2: handleUserCouponMenu(); break;
+                    case 3: testUsageHistory(); break;
+                    case 0: currentUser = null; return;
                     default: System.out.println("잘못된 선택입니다.");
                 }
             } catch (Exception e) {
@@ -112,9 +105,73 @@ public class TestClient {
         }
     }
 
-    /**
-     * 관리자용 메인 메뉴 (카테고리화)
-     */
+    // [1. 주문] 하위 메뉴
+    private static void handleUserOrderMenu() throws IOException {
+        while (true) {
+            System.out.println("\n--- [사용자 > 주문] ---");
+            System.out.println(" 1. 메뉴 목록 조회");
+            System.out.println(" 2. 메뉴 이미지 다운로드");
+            System.out.println(" 3. 결제 하기");
+            System.out.println(" 0. 뒤로가기");
+            System.out.print("선택>> ");
+
+            int choice = getIntInput();
+            if (choice == 0) return;
+
+            switch (choice) {
+                case 1: testMenuList(); break;
+                case 2: testMenuImageDownload(); break;
+                case 3: handleUserPaymentMenu(); break; // 결제 서브 메뉴로 이동
+                default: System.out.println("잘못된 선택");
+            }
+        }
+    }
+
+    // [1-3. 결제] 하위 메뉴
+    private static void handleUserPaymentMenu() throws IOException {
+        while (true) {
+            System.out.println("\n--- [사용자 > 주문 > 결제] ---");
+            System.out.println(" 1. 카드 결제");
+            System.out.println(" 2. 쿠폰 결제 (추가금 발생 가능)");
+            System.out.println(" 0. 뒤로가기");
+            System.out.print("선택>> ");
+
+            int choice = getIntInput();
+            if (choice == 0) return;
+
+            switch (choice) {
+                case 1: testPayment(ProtocolCode.PAYMENT_CARD_REQUEST); break;
+                case 2: testPayment(ProtocolCode.PAYMENT_COUPON_REQUEST); break;
+                default: System.out.println("잘못된 선택");
+            }
+        }
+    }
+
+    // [2. 쿠폰] 하위 메뉴
+    private static void handleUserCouponMenu() throws IOException {
+        while (true) {
+            System.out.println("\n--- [사용자 > 쿠폰] ---");
+            System.out.println(" 1. 내 쿠폰 조회");
+            System.out.println(" 2. 쿠폰 구매");
+            System.out.println(" 3. 쿠폰 구매 내역");
+            System.out.println(" 0. 뒤로가기");
+            System.out.print("선택>> ");
+
+            int choice = getIntInput();
+            if (choice == 0) return;
+
+            switch (choice) {
+                case 1: testCouponList(); break;
+                case 2: testCouponPurchase(); break;
+                case 3: testCouponPurchaseHistory(); break; // 쿠폰 사용 이력도 결제 내역에 포함됨
+                default: System.out.println("잘못된 선택");
+            }
+        }
+    }
+
+    // ===============================================================
+    // [관리자 전용 메뉴 핸들링]
+    // ===============================================================
     private static void handleAdminMenu() {
         while (currentUser != null) {
             System.out.println("\n================ [관리자 메뉴] ================");
@@ -369,6 +426,23 @@ public class TestClient {
             System.out.println("📜 이용 내역:");
             for(PaymentDTO p : list) System.out.printf("- %s (%d원) %s\n", p.getMenuName(), p.getMenuPriceAtTime(), p.getPaymentTime());
         } else printFail(res);
+    }
+
+    // 0x0A: 쿠폰 구매 내역 조회
+    private static void testCouponPurchaseHistory() throws IOException {
+        send(new Protocol(ProtocolType.REQUEST, ProtocolCode.COUPON_PURCHASE_HISTORY_REQUEST, currentUser.getUserId()));
+        Protocol res = receive();
+
+        if (res.getCode() == ProtocolCode.COUPON_PURCHASE_HISTORY_RESPONSE) {
+            List<CouponDTO> list = (List<CouponDTO>) res.getData();
+            System.out.println("📜 쿠폰 구매 이력 (" + list.size() + "건):");
+            for (CouponDTO c : list) {
+                String status = c.isUsed() ? "[사용됨]" : "[보유중]";
+                System.out.printf("- %s %d원권 (구매일: %s)\n", status, c.getPurchaseValue(), c.getPurchaseDate());
+            }
+        } else {
+            printFail(res);
+        }
     }
 
     // --- 관리자 기능 ---

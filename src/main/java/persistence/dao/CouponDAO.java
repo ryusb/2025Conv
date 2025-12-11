@@ -130,6 +130,27 @@ public class CouponDAO {
         return list;
     }
 
+    // 사용자의 모든 쿠폰 구매 내역 조회 (최신순)
+    public List<persistence.dto.CouponDTO> findAllCouponsByUserId(int userId) {
+        List<persistence.dto.CouponDTO> list = new ArrayList<>();
+        String sql = "SELECT * FROM coupon WHERE user_id = ? ORDER BY purchase_date DESC";
+
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, userId);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapResultSetToCoupon(rs));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("CouponDAO - 구매 내역 조회 오류: " + e.getMessage());
+        }
+        return list;
+    }
+
     // ResultSet 매핑 헬퍼
     private CouponDTO mapResultSetToCoupon(ResultSet rs) throws SQLException {
         CouponDTO coupon = new CouponDTO();
