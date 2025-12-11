@@ -26,9 +26,7 @@ public class PaymentController {
         MenuPriceDTO menu = menuPriceDAO.findById(request.getMenuPriceId());
         if (menu == null) return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
 
-        // ============================================================
-        // [추가] 1-1. 식당 영업 시간 체크 로직
-        // ============================================================
+        // 1-1. 식당 영업 시간 체크 로직
         RestaurantDTO restaurant = restaurantDAO.findById(menu.getRestaurantId());
         if (restaurant != null) {
             // 현재 시간이 식당 영업 시간(1타임 또는 2타임)에 포함되는지 확인
@@ -37,39 +35,52 @@ public class PaymentController {
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "현재 식당 영업 시간이 아닙니다.");
             }
         }
-        // ============================================================
 
         // 2. 사용자 타입에 따른 가격 결정
         int currentPrice = request.getUserType().equals("교직원") ? menu.getPriceFac() : menu.getPriceStu();
 
-        int payAmount = 0;
         int couponValue = 0;
         int additionalCost = 0;
+        String paymentStatus = "성공"; // 기본 상태
 
         // 3. 쿠폰 사용 여부 확인
         if (request.getUsedCouponId() != null && request.getUsedCouponId() > 0) {
             CouponDTO coupon = couponDAO.findById(request.getUsedCouponId());
-
             if (coupon == null || coupon.isUsed()) {
-                // 유효하지 않은 쿠폰
                 return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "유효하지 않은 쿠폰");
             }
-
+            if (coupon.getUserId() != request.getUserId()) {
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "본인의 쿠폰만 사용할 수 있습니다.");
+            }
             couponValue = coupon.getPurchaseValue(); // 구매 당시 쿠폰 가치
 
-            // 핵심 로직: 가격 인상으로 인한 차액 계산
             if (currentPrice > couponValue) {
                 additionalCost = currentPrice - couponValue;
+                paymentStatus = "추가금결제"; // 상태를 구체적으로 기록
             }
 
-            // 쿠폰 사용 처리
+            // 우선 쿠폰 사용 처리
             couponDAO.updateCouponToUsed(coupon.getCouponId());
         } else {
             // 카드 결제 (전액)
             additionalCost = currentPrice;
+            paymentStatus = "카드결제";
         }
 
-        // 4. 결제 정보 완성 및 DB 저장
+        // 4. 추가금 결제 처리 (카드 결제 시뮬레이션)
+        if (additionalCost > 0) {
+            boolean cardSuccess = simulateCardPayment(request.getUserId(), additionalCost);
+            if (!cardSuccess) {
+                // 카드 결제 실패 시 쿠폰 사용 롤백 (Rollback)
+                if (request.getUsedCouponId() != null && request.getUsedCouponId() > 0) {
+                    couponDAO.updateCouponToUnused(request.getUsedCouponId());
+                    System.out.println("[PaymentController] 카드 결제 실패로 쿠폰 사용을 취소했습니다. ID=" + request.getUsedCouponId());
+                }
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "카드 결제 승인 실패 (쿠폰 반환됨)");
+            }
+        }
+
+        // 5. 결제 정보 완성 및 DB 저장
         request.setPaymentTime(LocalDateTime.now());
         request.setRestaurantId(menu.getRestaurantId());
         request.setRestaurantName(menu.getRestaurantName());
@@ -77,7 +88,7 @@ public class PaymentController {
         request.setMenuPriceAtTime(currentPrice);
         request.setCouponValueUsed(couponValue);
         request.setAdditionalCardAmount(additionalCost);
-        request.setStatus("성공"); // 실제 결제 연동 없으므로 성공 처리
+        request.setStatus(paymentStatus); // '성공', '추가금결제', '카드결제' 등
 
         boolean success = paymentDAO.insertPayment(request);
 
@@ -85,7 +96,11 @@ public class PaymentController {
             // 성공 시, 추가금 등의 메시지를 보낼 수도 있지만 여기선 성공 코드만 리턴
             return new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, null);
         } else {
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
+            // 결제 내역 저장 실패 시에도 롤백 필요
+            if (request.getUsedCouponId() != null && request.getUsedCouponId() > 0) {
+                couponDAO.updateCouponToUnused(request.getUsedCouponId());
+            }
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "결제 내역 저장 실패");
         }
     }
 
@@ -103,5 +118,11 @@ public class PaymentController {
 
         // 둘 중 하나라도 열려있으면 영업 중(true)
         return isOpen1 || isOpen2;
+    }
+
+    // 카드 결제 시뮬레이션 (PG 연동 대용)
+    private boolean simulateCardPayment(int userId, int amount) {
+        System.out.println("[SERVER Log] 카드 결제 승인 요청: User=" + userId + ", Amount=" + amount + "원");
+        return true; // 무조건 승인으로 가정
     }
 }

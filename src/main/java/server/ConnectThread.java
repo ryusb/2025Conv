@@ -22,7 +22,7 @@ public class ConnectThread extends Thread {
                 System.out.println("🔗 새 클라이언트 접속: " + clientSocket.getInetAddress());
 
                 // 2. ClientHandler 스레드에 요청 처리를 위임
-                // ClientHandler는 이전에 구현한 (또는 구현할) 요청 처리 로직을 담고 있습니다.
+                // ClientHandler는 이전에 구현한 (또는 구현할) 요청 처리 로직을 담고 있습니다
                 Thread clientHandler = new ClientHandler(clientSocket);
                 clientHandler.start();
             }

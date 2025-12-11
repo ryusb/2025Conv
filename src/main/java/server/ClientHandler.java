@@ -14,6 +14,8 @@ import java.time.format.DateTimeParseException;
 import network.Protocol;
 import network.ProtocolCode;
 import network.ProtocolType;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import persistence.dao.MenuPriceDAO;
 import persistence.dao.PaymentDAO;
 import persistence.dao.RestaurantDAO;
@@ -21,6 +23,7 @@ import persistence.dao.UserDAO;
 import persistence.dto.*;
 
 public class ClientHandler extends Thread {
+    private static final Log log = LogFactory.getLog(ClientHandler.class);
     private final Socket clientSocket;
 
     // 컨트롤러 및 DAO 초기화
@@ -134,6 +137,7 @@ public class ClientHandler extends Thread {
                     if (result != null) {
                         this.loginUser = result; // 세션에 로그인 사용자 저장
                         // 성공 시 LOGIN_RESPONSE (0x30) + 유저 데이터 반환
+                        loginUser = result;
                         return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, result);
                     } else {
                         // 실패 시 INVALID_INPUT (0x52) 반환
@@ -228,45 +232,19 @@ public class ClientHandler extends Thread {
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.USAGE_HISTORY_RESPONSE,  history);
                 }
 
+                case ProtocolCode.COUPON_PURCHASE_HISTORY_REQUEST: { // 0x0A
+                    int userId = (int) req.getData();
+                    return couponController.getCouponPurchaseHistory(userId);
+                }
+
                 // ==========================================
                 // II. 관리자 - 메뉴/가격 관리
                 // ==========================================
                 case ProtocolCode.MENU_INSERT_REQUEST:       // 0x10
+                    return menuController.registerOrUpdateMenu((MenuPriceDTO) req.getData());
                 case ProtocolCode.MENU_UPDATE_REQUEST:       // 0x11
                 {
-                    MenuPriceDTO dto = (MenuPriceDTO) req.getData();
-
-                    // 클라이언트가 전달한 restaurantId가 없으면 이름 기반 매핑/조회로 채움
-                    if (dto.getRestaurantId() <= 0) {
-                        String name = dto.getRestaurantName();
-                        if (name != null) {
-                            // 기본 매핑 (클라이언트 영문 코드명 처리)
-                            dto.setRestaurantId(
-                                    switch (name) {
-                                        case "stdCafeteria" -> 1;
-                                        case "facCafeteria" -> 2;
-                                        case "snack" -> 3;
-                                        default -> dto.getRestaurantId();
-                                    });
-                        }
-
-                        // 그래도 0 이하이면 DB에서 이름으로 조회
-                        if (dto.getRestaurantId() <= 0 && name != null) {
-                            RestaurantDAO dao = new RestaurantDAO();
-                            dto.setRestaurantId(dao.findRestaurantIdByName(name));
-                        }
-                    }
-
-                    // 이름이 없고 id만 있는 경우 DB로 이름 채움
-                    if ((dto.getRestaurantName() == null || dto.getRestaurantName().isBlank()) && dto.getRestaurantId() > 0) {
-                        RestaurantDAO dao = new RestaurantDAO();
-                        RestaurantDTO resto = dao.findById(dto.getRestaurantId());
-                        if (resto != null) {
-                            dto.setRestaurantName(resto.getName());
-                        }
-                    }
-
-                    return menuController.registerOrUpdateMenu(dto);
+                    return menuController.registerOrUpdateMenu((MenuPriceDTO) req.getData());
                 }
 
                 case ProtocolCode.MENU_PHOTO_REGISTER_REQUEST: // 0x12
