@@ -133,8 +133,7 @@ public class PaymentDAO {
 
         String sql = "SELECT HOUR(p.payment_time) AS hour_slot, p.restaurant_id, p.restaurant_name, mp.meal_time " +
                 "FROM payment p " +
-                "LEFT JOIN menu_price mp ON p.menu_price_id = mp.menu_price_id " +
-                "WHERE p.status <> '실패'";
+                "LEFT JOIN menu_price mp ON p.menu_price_id = mp.menu_price_id";
 
         // 식당별 → 시간대별 집계 Map
         Map<String, Map<String, Integer>> stats = new LinkedHashMap<>();
@@ -147,9 +146,10 @@ public class PaymentDAO {
                 int restaurantId = rs.getInt("restaurant_id");
                 String restaurant = rs.getString("restaurant_name");
                 String mealTime = rs.getString("meal_time");
+                int hourSlot = rs.getInt("hour_slot");
 
                 // 시간대 구하기
-                String timeSlot = getMealTimeSlot(restaurantId, restaurant, mealTime);
+                String timeSlot = getMealTimeSlot(restaurantId, restaurant, mealTime, hourSlot);
                 if (timeSlot == null) continue; // 운영 시간 밖 데이터는 통계 제외
 
                 // 집계
@@ -183,7 +183,7 @@ public class PaymentDAO {
 // ---------------------------------------------------
 // 식당별 운영 시간대 매핑 함수
 // ---------------------------------------------------
-    private String getMealTimeSlot(int restaurantId, String restaurantName, String mealTime) {
+    private String getMealTimeSlot(int restaurantId, String restaurantName, String mealTime, int hourSlot) {
         String key = normalizeRestaurantKey(restaurantId, restaurantName);
         String mt = mealTime == null ? "" : mealTime.trim().toLowerCase();
 
@@ -191,19 +191,23 @@ public class PaymentDAO {
             case "stdCafeteria": // opt1 아침, opt2 점심
                 if (mt.equals("opt1")) return "아침";
                 if (mt.equals("opt2")) return "점심";
-                return null; // opt0 없음
+                break; // opt0/미정은 시간 기반으로 처리
 
             case "facCafeteria": // opt1 점심, opt2 저녁
                 if (mt.equals("opt1")) return "점심";
                 if (mt.equals("opt2")) return "저녁";
-                return null; // opt0 없음
+                break; // opt0/미정은 시간 기반으로 처리
 
             case "snack": // opt0 상시
-                return "상시";
+                // 분식당은 주문 시간 기준으로 시간대 표시 (예: 12시)
+                return String.format("%02d시", hourSlot);
 
             default:
-                return null;
+                break;
         }
+
+        // 시간 정보를 사용한 기본 슬롯 (식당/mealTime 정보가 없거나 opt0인 경우)
+        return String.format("%02d시", hourSlot);
     }
 
     private String normalizeRestaurantKey(int restaurantId, String restaurantName) {
