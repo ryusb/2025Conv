@@ -22,8 +22,9 @@ public class PaymentController {
     public Protocol processPayment(PaymentDTO request) {
         // 1. 메뉴 정보 확인 (현재 가격 확인)
         MenuPriceDTO menu = menuPriceDAO.findById(request.getMenuPriceId());
-        if (menu == null) return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
-
+        if (menu == null) {
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "존재하지 않는 메뉴입니다.");
+        }
         // 1-1. 메뉴 날짜 유효성 체크 (DB 시간 기준)
         if (!menuPriceDAO.isMenuDateValid(request.getMenuPriceId())) {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "해당 메뉴는 오늘 제공되지 않습니다.");
@@ -36,7 +37,7 @@ public class PaymentController {
         }
 
         // 2. 사용자 타입에 따른 가격 결정
-        int currentPrice = request.getUserType().equals("교직원") ? menu.getPriceFac() : menu.getPriceStu();
+        int currentPrice = request.getUserType().equals("facility") ? menu.getPriceFac() : menu.getPriceStu();
 
         int couponValue = 0;
         int additionalCost = 0;
@@ -80,7 +81,6 @@ public class PaymentController {
         }
 
         // 5. 결제 정보 완성 및 DB 저장
-        request.setPaymentTime(LocalDateTime.now());
         request.setRestaurantId(menu.getRestaurantId());
         request.setRestaurantName(menu.getRestaurantName());
         request.setMenuName(menu.getMenuName());

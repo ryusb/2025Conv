@@ -55,11 +55,11 @@ public class TestClient {
                     }
                 } else {
                     // 2. 권한별 메뉴 분기
-                    String role = currentUser.getUserType(); // "admin" or "학생"/"교직원"
+                    String role = currentUser.getUserType(); // "admin" or "student"/"facility"
 
                     // DB에 "admin"으로 저장되어 있는지 "관리자"로 저장되어 있는지에 따라 조건 수정 필요
                     // 여기서는 'admin' 문자열을 포함하거나 '관리자'인 경우 관리자로 취급
-                    if ("admin".equalsIgnoreCase(role) || "관리자".equals(role)) {
+                    if ("admin".equalsIgnoreCase(role)) {
                         handleAdminMenu();
                     } else {
                         handleUserMenu();
@@ -315,7 +315,7 @@ public class TestClient {
 
         if (res.getCode() == ProtocolCode.LOGIN_RESPONSE) {
             currentUser = (UserDTO) res.getData();
-            System.out.println("✅ 로그인 성공! (" + currentUser.getUserType() + "님 환영합니다)");
+            System.out.println("✅ 로그인 성공! (" + currentUser.getUserId() + "님 환영합니다)" + "권한: " + currentUser.getUserType());
             return true;
         } else {
             System.out.println("❌ 로그인 실패: 아이디 또는 비밀번호를 확인하세요.");
