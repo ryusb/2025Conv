@@ -35,7 +35,7 @@ public class OrderService {
         if (!isResponseOK(response) ||
             response.getCode() != ProtocolCode.MENU_LIST_RESPONSE) {
 
-            OutputHandler.showError("메뉴 조회 실패");
+            OutputHandler.showFail("메뉴 조회 실패");
             return;
         }
 
@@ -70,7 +70,7 @@ public class OrderService {
                 case 1 -> loop = orderByRestaurant();
                 case 2 -> imageDownload();
                 case 3 -> loop = false;
-                default -> OutputHandler.showError("잘못된 입력입니다.");
+                default -> OutputHandler.showFail("잘못된 입력입니다.");
             }
         }
     }
@@ -93,14 +93,14 @@ public class OrderService {
         if (!isResponseOK(menuRes) ||
             menuRes.getCode() != ProtocolCode.MENU_LIST_RESPONSE) {
 
-            OutputHandler.showError("메뉴 정보를 가져오지 못했습니다.");
+            OutputHandler.showFail("메뉴 정보를 가져오지 못했습니다.");
             return false;
         }
 
         // 서버가 MenuPriceDTO 하나를 보내줘야 함
         MenuPriceDTO menu = (MenuPriceDTO) menuRes.getData();
         if (menu == null) {
-            OutputHandler.showError("메뉴 정보가 비었습니다.");
+            OutputHandler.showFail("메뉴 정보가 비었습니다.");
             return false;
         }
 
@@ -131,7 +131,7 @@ public class OrderService {
                     dto
             );
             if (res == null || res.getCode() != ProtocolCode.SUCCESS) {
-                OutputHandler.showError("쿠폰 결제 실패");
+                OutputHandler.showFail("쿠폰 결제 실패");
             }
         }
 
@@ -144,7 +144,7 @@ public class OrderService {
         if (cardRes != null && cardRes.getCode() == ProtocolCode.SUCCESS) {
             OutputHandler.showSuccess("결제 완료");
         } else {
-            OutputHandler.showError("카드 결제 실패");
+            OutputHandler.showFail("카드 결제 실패");
         }
 
         return false;
@@ -165,13 +165,13 @@ public class OrderService {
         if (!isResponseOK(res) ||
             res.getCode() != ProtocolCode.MENU_IMAGE_RESPONSE) {
 
-            OutputHandler.showError("이미지 다운로드 실패");
+            OutputHandler.showFail("이미지 다운로드 실패");
             return;
         }
 
         byte[] img = (byte[]) res.getData();
         if (img == null) {
-            OutputHandler.showError("이미지 데이터가 비었습니다.");
+            OutputHandler.showFail("이미지 데이터가 비었습니다.");
             return;
         }
 
@@ -179,7 +179,7 @@ public class OrderService {
             fos.write(img);
             OutputHandler.showSuccess("이미지 다운로드 완료");
         } catch (Exception e) {
-            OutputHandler.showError("이미지 저장 실패");
+            OutputHandler.showFail("이미지 저장 실패");
         }
     }
 
@@ -198,7 +198,7 @@ public class OrderService {
         if (!isResponseOK(response) ||
             response.getCode() != ProtocolCode.USAGE_HISTORY_RESPONSE) {
 
-            OutputHandler.showError("내역 조회 실패");
+            OutputHandler.showFail("내역 조회 실패");
             return;
         }
 

@@ -44,19 +44,19 @@ public class UserService {
                 case 2 -> couponMenu();
                 case 3 -> historyMenu();
                 case 4 -> isRunning = false;
-                default -> OutputHandler.showError("잘못된 선택입니다");
+                default -> OutputHandler.showFail("잘못된 선택입니다");
             }
         }
     }
 
     private static void printMenu(String[] menu) {
         System.out.println();
-        OutputHandler.showBar();
+        OutputHandler.showSingleBar();
         OutputHandler.showTitle(menu[0]);
         for (int i = 1; i < menu.length; i++) {
             OutputHandler.showMenu(i, menu[i]);
         }
-        OutputHandler.showBar();
+        OutputHandler.showSingleBar();
     }
 
     private static void orderMenu() {
@@ -70,7 +70,7 @@ public class UserService {
                 case 2 -> OrderService.order("stdCafeteria");
                 case 3 -> OrderService.order("snack");
                 case 4 -> isRunning = false;
-                default -> OutputHandler.showError("잘못된 선택입니다");
+                default -> OutputHandler.showFail("잘못된 선택입니다");
             }
         }
     }
@@ -86,7 +86,7 @@ public class UserService {
                 case 1 -> CouponService.remainCoupon();
                 case 2 -> CouponService.buyCoupon();
                 case 3 -> isRunning = false;
-                default -> OutputHandler.showError("잘못된 선택입니다");
+                default -> OutputHandler.showFail("잘못된 선택입니다");
             }
         }
     }
@@ -102,7 +102,7 @@ public class UserService {
                 case 1 -> OrderService.paymentHistory();
                 case 2 -> CouponService.paymentHistory();
                 case 3 -> isRunning = false;
-                default -> OutputHandler.showError("잘못된 선택입니다");
+                default -> OutputHandler.showFail("잘못된 선택입니다");
             }
         }
     }

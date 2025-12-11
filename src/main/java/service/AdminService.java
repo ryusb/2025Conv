@@ -34,13 +34,13 @@ public class AdminService {
                 case 5 -> System.out.println("");
                 case 6 -> System.out.println("");
                 case 7 -> isRunning = false;
-                default -> OutputHandler.showError("잘못된 선택입니다");
+                default -> OutputHandler.showFail("잘못된 선택입니다");
             }
         }
     }
 
     private static void printMenu() {
-        OutputHandler.showBar();
+        OutputHandler.showSingleBar();
         OutputHandler.showTitle("관리자 메뉴");
         OutputHandler.showMenu(1, "메뉴 등록");
         OutputHandler.showMenu(2, "메뉴 수정(메뉴, 가격)");
@@ -49,7 +49,7 @@ public class AdminService {
         OutputHandler.showMenu(5, "현황 조회");
         OutputHandler.showMenu(6, "CSV 관리");
         OutputHandler.showMenu(7, "종료");
-        OutputHandler.showBar();
+        OutputHandler.showSingleBar();
     }
 
     /**
@@ -62,7 +62,7 @@ public class AdminService {
         int restaurantId = mapRestaurantId(restaurantChoice);
         String restaurantName = mapRestaurantName(restaurantChoice);
         if (restaurantId == -1 || restaurantName == null) {
-            OutputHandler.showError("잘못된 식당 선택입니다.");
+            OutputHandler.showFail("잘못된 식당 선택입니다.");
             return;
         }
         String semesterName = InputHandler.getString("학기명 (예: 2025-1)");
@@ -90,7 +90,7 @@ public class AdminService {
         if (response != null && response.getCode() == ProtocolCode.SUCCESS) {
             OutputHandler.showSuccess("메뉴 등록 요청이 성공적으로 처리되었습니다.");
         } else {
-            OutputHandler.showError("메뉴 등록 요청 실패");
+            OutputHandler.showFail("메뉴 등록 요청 실패");
         }
     }
 
@@ -104,7 +104,7 @@ public class AdminService {
         int restaurantId = mapRestaurantId(restaurantChoice);
         String restaurantName = mapRestaurantName(restaurantChoice);
         if (restaurantId == -1 || restaurantName == null) {
-            OutputHandler.showError("잘못된 식당 선택입니다.");
+            OutputHandler. showFail("잘못된 식당 선택입니다.");
             return;
         }
 
@@ -119,14 +119,14 @@ public class AdminService {
         Protocol listRequest = new Protocol(ProtocolType.REQUEST, ProtocolCode.MENU_LIST_REQUEST, listReq);
         Protocol listResponse = sendRequest(listRequest);
         if (listResponse == null || listResponse.getCode() != ProtocolCode.MENU_LIST_RESPONSE) {
-            OutputHandler.showError("메뉴 목록을 불러오지 못했습니다.");
+            OutputHandler. showFail("메뉴 목록을 불러오지 못했습니다.");
             return;
         }
 
         @SuppressWarnings("unchecked")
         List<MenuPriceDTO> menus = (List<MenuPriceDTO>) listResponse.getData();
         if (menus == null || menus.isEmpty()) {
-            OutputHandler.showError("해당 조건의 메뉴가 없습니다.");
+            OutputHandler. showFail("해당 조건의 메뉴가 없습니다.");
             return;
         }
 
@@ -172,7 +172,7 @@ public class AdminService {
         if (updateResponse != null && updateResponse.getCode() == ProtocolCode.SUCCESS) {
             OutputHandler.showSuccess("메뉴 수정 요청이 성공적으로 처리되었습니다.");
         } else {
-            OutputHandler.showError("메뉴 수정 요청 실패");
+            OutputHandler. showFail("메뉴 수정 요청 실패");
         }
     }
 
@@ -233,7 +233,7 @@ public class AdminService {
             System.arraycopy(body, 0, packet, 6, dataLength);
             return new Protocol(packet);
         } catch (Exception e) {
-            OutputHandler.showError("요청 송수신 중 오류: " + e.getMessage());
+            OutputHandler. showFail("요청 송수신 중 오류: " + e.getMessage());
             return null;
         }
     }

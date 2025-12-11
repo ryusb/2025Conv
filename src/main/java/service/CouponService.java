@@ -29,15 +29,15 @@ public class CouponService {
                 return;
             }
 
-            OutputHandler.showBar();
+            OutputHandler.showSingleBar();
             OutputHandler.showTitle(userId + "님의 쿠폰");
 
             for (CouponDTO c : list) {
                 OutputHandler.showMessage(c.getPurchaseValue() + "원");
             }
-            OutputHandler.showBar();
+            OutputHandler.showSingleBar();
         } else {
-            OutputHandler.showError("쿠폰 조회 실패");
+            OutputHandler.showFail("쿠폰 조회 실패");
         }
     }
 
@@ -45,7 +45,7 @@ public class CouponService {
     public static void buyCoupon() {
         int quantity = InputHandler.getInt("구매 수량");
         if (quantity <= 0) {
-            OutputHandler.showError("양수만 입력 가능");
+            OutputHandler.showFail("양수만 입력 가능");
             return;
         }
 
@@ -57,7 +57,7 @@ public class CouponService {
 
         // null 또는 빈 리스트 체크
         if (policies == null || policies.isEmpty()) {
-            OutputHandler.showError("쿠폰 정책이 없습니다.");
+            OutputHandler.showFail("쿠폰 정책이 없습니다.");
             return;
         }
 
@@ -80,7 +80,7 @@ public class CouponService {
             if (result.getCode() == ProtocolCode.SUCCESS) {
                 OutputHandler.showSuccess("쿠폰 결제 성공");
             } else {
-                OutputHandler.showError("결제 실패");
+                OutputHandler.showFail("결제 실패");
             }
         } else {
             OutputHandler.showMessage("결제 취소");
@@ -111,7 +111,7 @@ public class CouponService {
                 System.out.println(p.getMenuName() + " - " + p.getMenuPriceAtTime() + "원");
             }
         } else {
-            OutputHandler.showError("내역 조회 실패");
+            OutputHandler.showFail("내역 조회 실패");
         }
     }
 }

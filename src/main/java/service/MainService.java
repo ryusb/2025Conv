@@ -16,7 +16,7 @@ public class MainService {
         switch (role) {
             case "admin" -> AdminService.mainService();
             case "other", "student" -> UserService.mainService();
-            default -> OutputHandler.showError("Invalid role");
+            default -> OutputHandler.showFail("Invalid role");
         }
     }
 
@@ -36,7 +36,7 @@ public class MainService {
         );
 
         if (response == null) {
-            OutputHandler.showError("서버 응답 없음");
+            OutputHandler.showFail("서버 응답 없음");
             return null;
         }
 
@@ -46,7 +46,7 @@ public class MainService {
             return user.getUserType();   // "admin" / "student" / "other"
         }
 
-        OutputHandler.showError("로그인 실패");
+        OutputHandler.showFail("로그인 실패");
         return null;
     }
 }
