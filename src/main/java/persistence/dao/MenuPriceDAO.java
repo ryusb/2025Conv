@@ -11,8 +11,11 @@ public class MenuPriceDAO {
     // 현재 학기, 특정 식당, 특정 시간대의 메뉴 목록을 조회
     public List<MenuPriceDTO> findCurrentMenus(int restaurantId, String mealTime) {
         List<MenuPriceDTO> menuList = new ArrayList<>();
-        // is_current_semester=TRUE 필터링은 Java 코드 단순화를 위해 필수적입니다.
-        String sql = "SELECT * FROM menu_price WHERE restaurant_id = ? AND meal_time = ? AND is_current_semester = TRUE";
+        // CURDATE(): DB 서버의 현재 날짜 함수
+        // date가 NULL인 경우(상시 메뉴)도 포함하거나, 날짜가 지정된 경우 오늘 날짜와 일치해야 함
+        String sql = "SELECT * FROM menu_price WHERE restaurant_id = ? AND meal_time = ? " +
+                "AND is_current_semester = TRUE " +
+                "AND (date IS NULL OR DATE(date) = CURDATE())";
 
         try (Connection conn = DBConnectionManager.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -30,8 +33,9 @@ public class MenuPriceDAO {
                     menu.setImagePath(rs.getString("image_path"));
                     menu.setPriceStu(rs.getInt("price_stu"));
                     menu.setPriceFac(rs.getInt("price_fac"));
-                    // 나머지 필드 설정 생략
-
+                    if (rs.getTimestamp("date") != null) {
+                        menu.setDate(rs.getTimestamp("date").toLocalDateTime());
+                    }
                     menuList.add(menu);
                 }
             }
@@ -39,6 +43,23 @@ public class MenuPriceDAO {
             System.err.println("MenuPriceDAO - 메뉴 조회 중 DB 오류: " + e.getMessage());
         }
         return menuList;
+    }
+
+    // 결제 요청 시 해당 메뉴가 '오늘(DB 기준)' 유효한지 검증
+    public boolean isMenuDateValid(int menuPriceId) {
+        String sql = "SELECT 1 FROM menu_price WHERE menu_price_id = ? " +
+                "AND (date IS NULL OR DATE(date) = CURDATE())";
+
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, menuPriceId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next(); // 결과가 있으면 유효한 날짜
+            }
+        } catch (SQLException e) {
+            System.err.println("MenuPriceDAO - 메뉴 날짜 검증 오류: " + e.getMessage());
+            return false;
+        }
     }
 
     // 식당/날짜(옵션)/학기(옵션)/시간대(옵션)로 메뉴 목록 조회

@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 
 public class Serializer {
@@ -111,6 +112,9 @@ public class Serializer {
         if (obj instanceof LocalDateTime) {
             return dateToByteArray((LocalDateTime) obj);
         }
+        if (obj instanceof LocalTime) {
+            return localTimeToByteArray((LocalTime) obj);
+        }
 
         Class<?> c = obj.getClass();
         Field[] member = c.getDeclaredFields();
@@ -148,8 +152,9 @@ public class Serializer {
                         arr = stringToByteArray((String) memberVal);
                     } else if (typeStr.contains("LocalDateTime")) {
                         arr = dateToByteArray((LocalDateTime) memberVal);
-                    } else {
-                        // DTO 내부의 객체 필드 (재귀 직렬화)
+                    } else if (typeStr.contains("LocalTime")) {
+                        arr = localTimeToByteArray((LocalTime) memberVal);
+                    }  else {
                         arr = getBytes(memberVal);
                         byte[] len = intToByteArray(arr.length);
                         addArrList(result, len);
@@ -159,6 +164,19 @@ public class Serializer {
             }
         }
         return byteListToArray(result);
+    }
+
+    public static byte[] localTimeToByteArray(LocalTime val) {
+        // 시, 분, 초만 저장 (각 4바이트) -> 총 12바이트
+        byte[] hour = intToByteArray(val.getHour());
+        byte[] minute = intToByteArray(val.getMinute());
+        byte[] second = intToByteArray(val.getSecond());
+
+        byte[] result = new byte[12];
+        System.arraycopy(hour, 0, result, 0, 4);
+        System.arraycopy(minute, 0, result, 4, 4);
+        System.arraycopy(second, 0, result, 8, 4);
+        return result;
     }
 
     public static byte[] intToByteArray(int val) {

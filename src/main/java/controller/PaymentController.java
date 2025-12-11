@@ -10,10 +10,8 @@ import persistence.dao.RestaurantDAO;
 import persistence.dto.CouponDTO;
 import persistence.dto.MenuPriceDTO;
 import persistence.dto.PaymentDTO;
-import persistence.dto.RestaurantDTO;
 
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 public class PaymentController {
     private final PaymentDAO paymentDAO = new PaymentDAO();
@@ -24,20 +22,22 @@ public class PaymentController {
     public Protocol processPayment(PaymentDTO request) {
         // 1. 메뉴 정보 확인 (현재 가격 확인)
         MenuPriceDTO menu = menuPriceDAO.findById(request.getMenuPriceId());
-        if (menu == null) return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
+        if (menu == null) {
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "존재하지 않는 메뉴입니다.");
+        }
+        // 1-1. 메뉴 날짜 유효성 체크 (DB 시간 기준)
+        if (!menuPriceDAO.isMenuDateValid(request.getMenuPriceId())) {
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "해당 메뉴는 오늘 제공되지 않습니다.");
+        }
 
-        // 1-1. 식당 영업 시간 체크 로직
-        RestaurantDTO restaurant = restaurantDAO.findById(menu.getRestaurantId());
-        if (restaurant != null) {
-            // 현재 시간이 식당 영업 시간(1타임 또는 2타임)에 포함되는지 확인
-            if (!isRestaurantOpen(restaurant)) {
-                // 영업 시간이 아니라면 결제 거절 (메시지 포함)
-                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "현재 식당 영업 시간이 아닙니다.");
-            }
+        // 1-2. 식당 영업 시간 체크 (DB 시간 기준)
+        // restaurantDAO.isOpenNow()가 내부적으로 DB CURRENT_TIME() 사용
+        if (!restaurantDAO.isOpenNow(menu.getRestaurantId())) {
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "현재 식당 영업 시간이 아닙니다.");
         }
 
         // 2. 사용자 타입에 따른 가격 결정
-        int currentPrice = request.getUserType().equals("교직원") ? menu.getPriceFac() : menu.getPriceStu();
+        int currentPrice = request.getUserType().equals("facility") ? menu.getPriceFac() : menu.getPriceStu();
 
         int couponValue = 0;
         int additionalCost = 0;
@@ -81,7 +81,6 @@ public class PaymentController {
         }
 
         // 5. 결제 정보 완성 및 DB 저장
-        request.setPaymentTime(LocalDateTime.now());
         request.setRestaurantId(menu.getRestaurantId());
         request.setRestaurantName(menu.getRestaurantName());
         request.setMenuName(menu.getMenuName());
@@ -93,31 +92,17 @@ public class PaymentController {
         boolean success = paymentDAO.insertPayment(request);
 
         if (success) {
-            // 성공 시, 추가금 등의 메시지를 보낼 수도 있지만 여기선 성공 코드만 리턴
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, null);
+            LocalDateTime dbTime = paymentDAO.selectDbTime();
+            if (dbTime != null) {
+                request.setPaymentTime(dbTime);
+            }
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, request);
         } else {
-            // 결제 내역 저장 실패 시에도 롤백 필요
             if (request.getUsedCouponId() != null && request.getUsedCouponId() > 0) {
                 couponDAO.updateCouponToUnused(request.getUsedCouponId());
             }
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "결제 내역 저장 실패");
         }
-    }
-
-    private boolean isRestaurantOpen(RestaurantDTO r) {
-        LocalTime now = LocalTime.now();
-
-        // 1타임(예: 아침/점심) 운영 여부 확인
-        // null 체크: DB에 시간이 비어있지 않다고 가정하지만 안전을 위해 추가 가능
-        boolean isOpen1 = r.getOpenTime1() != null && r.getCloseTime1() != null &&
-                !now.isBefore(r.getOpenTime1()) && !now.isAfter(r.getCloseTime1());
-
-        // 2타임(예: 저녁) 운영 여부 확인
-        boolean isOpen2 = r.getOpenTime2() != null && r.getCloseTime2() != null &&
-                !now.isBefore(r.getOpenTime2()) && !now.isAfter(r.getCloseTime2());
-
-        // 둘 중 하나라도 열려있으면 영업 중(true)
-        return isOpen1 || isOpen2;
     }
 
     // 카드 결제 시뮬레이션 (PG 연동 대용)

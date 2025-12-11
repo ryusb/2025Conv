@@ -78,10 +78,7 @@ public class Protocol {
             return Deserializer.getObject(arr);
         }
         else if (type == ProtocolType.RESULT) {
-            // 결과 코드 범위 체크 (성공~서버에러)
-            if (code >= ProtocolCode.SUCCESS && code <= ProtocolCode.SERVER_ERROR) {
-                return null;
-            }
+            return Deserializer.getObject(arr);
         }
         try {
             String hexCode = Integer.toHexString(code & 0xFF).toUpperCase();

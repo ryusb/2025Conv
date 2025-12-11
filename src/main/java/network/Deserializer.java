@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 
 public class Deserializer {
@@ -101,7 +102,13 @@ public class Deserializer {
             System.arraycopy(objInfo, idx, data, 0, len);
             return data;
         }
-        // List 복원
+        if (c == LocalTime.class) {
+            byte[] buf = new byte[INT_LENGTH];
+            System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int hour = byteArrayToInt(buf);
+            System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int minute = byteArrayToInt(buf);
+            System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int second = byteArrayToInt(buf);
+            return LocalTime.of(hour, minute, second);
+        }
         if (List.class.isAssignableFrom(c)) {
             List<Object> list = new ArrayList<>();
             byte[] lenBytes = new byte[INT_LENGTH];
@@ -109,10 +116,8 @@ public class Deserializer {
             int size = byteArrayToInt(lenBytes);
 
             for (int i = 0; i < size; i++) {
-                // 요소 길이 읽기
                 System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
                 int elemLen = byteArrayToInt(lenBytes);
-                // 요소 데이터 읽어서 객체로 복원
                 byte[] elemData = new byte[elemLen];
                 System.arraycopy(objInfo, idx, elemData, 0, elemLen); idx += elemLen;
                 list.add(getObject(elemData));
@@ -193,6 +198,12 @@ public class Deserializer {
                     System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int hour = byteArrayToInt(buf);
                     System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int minute = byteArrayToInt(buf);
                     member[i].set(result, LocalDateTime.of(year, month, day, hour, minute));
+                } else if (typeStr.contains("LocalTime")) {
+                    byte[] buf = new byte[INT_LENGTH];
+                    System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int hour = byteArrayToInt(buf);
+                    System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int minute = byteArrayToInt(buf);
+                    System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int second = byteArrayToInt(buf);
+                    member[i].set(result, LocalTime.of(hour, minute, second));
                 } else {
                     // DTO 필드 복원 (재귀)
                     byte[] lenBytes = new byte[INT_LENGTH];

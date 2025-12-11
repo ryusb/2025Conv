@@ -13,8 +13,8 @@ import network.ProtocolCode;
 import network.ProtocolType;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import persistence.dao.MenuPriceDAO;
 import persistence.dao.PaymentDAO;
+import persistence.dao.RestaurantDAO;
 import persistence.dao.UserDAO;
 import persistence.dto.*;
 
@@ -29,6 +29,7 @@ public class ClientHandler extends Thread {
     private final PriceController priceController = new PriceController();
     private final UserDAO userDAO = new UserDAO();
     private final PaymentDAO paymentDAO = new PaymentDAO();
+    private final RestaurantDAO restaurantDAO = new RestaurantDAO();
 
     private UserDTO loginUser = null;
 
@@ -67,6 +68,11 @@ public class ClientHandler extends Thread {
             System.err.println("클라이언트 핸들러 오류: " + e.getMessage());
             e.printStackTrace();
         } finally {
+            if (this.loginUser != null) {
+                SessionManager.removeSession(this.loginUser.getLoginId());
+                System.out.println("세션 종료(로그아웃): " + this.loginUser.getLoginId());
+            }
+
             try {
                 if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
             } catch (IOException e) {}
@@ -114,8 +120,8 @@ public class ClientHandler extends Thread {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
         }
 
-        // [추가] 권한 체크 로직 (관리자 기능 접근 제어)
-        // ProtocolCode 0x10 ~ 0x29 범위는 관리자 전용이라고 가정
+        // 권한 체크 로직 (관리자 기능 접근 제어)
+        // ProtocolCode 0x10 ~ 0x29 범위는 관리자 전용
         if (req.getCode() >= 0x10 && req.getCode() <= 0x29) {
             if (this.loginUser == null || !"admin".equals(this.loginUser.getUserType())) {
                 // 0x55: PERMISSION_DENIED 반환
@@ -130,13 +136,26 @@ public class ClientHandler extends Thread {
                 // ==========================================
                 case ProtocolCode.LOGIN_REQUEST: { // 0x02
                     UserDTO u = (UserDTO) req.getData();
+                    // 1. 중복 로그인 체크
+                    ClientHandler activeSession = SessionManager.getSession(u.getLoginId());
+                    // 이미 접속중인데, 그게 '나(this)'가 아니라면 다른 기기 접속임 -> 차단
+                    if (activeSession != null && activeSession != this) {
+                        return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "이미 접속 중인 아이디입니다.");
+                    }
+                    // 2. DB 인증
                     UserDTO result = userDAO.findUserByLoginId(u.getLoginId(), u.getPassword());
                     if (result != null) {
-                        // 성공 시 LOGIN_RESPONSE (0x30) + 유저 데이터 반환
-                        loginUser = result;
+                        // 3. 세션 등록 (기존 로그인 정보가 있다면 갱신)
+                        if (this.loginUser != null) {
+                            // 같은 소켓에서 다른 아이디로 로그인 시도 시 이전 아이디 제거
+                            SessionManager.removeSession(this.loginUser.getLoginId());
+                        }
+
+                        SessionManager.addSession(result.getLoginId(), this);
+                        this.loginUser = result;
+
                         return new Protocol(ProtocolType.RESPONSE, ProtocolCode.LOGIN_RESPONSE, result);
                     } else {
-                        // 실패 시 INVALID_INPUT (0x52) 반환
                         return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, null);
                     }
                 }
@@ -197,6 +216,11 @@ public class ClientHandler extends Thread {
                 case ProtocolCode.COUPON_PURCHASE_HISTORY_REQUEST: { // 0x0A
                     int userId = (int) req.getData();
                     return couponController.getCouponPurchaseHistory(userId);
+                }
+
+                case ProtocolCode.RESTAURANT_LIST_REQUEST: { // 0x0B
+                    List<RestaurantDTO> list = restaurantDAO.findAllRestaurants();
+                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.RESTAURANT_LIST_RESPONSE, list);
                 }
 
                 // ==========================================
