@@ -148,10 +148,7 @@ public class PaymentDAO {
 
                 // 시간대 구하기
                 String timeSlot = getMealTimeSlot(restaurantId, restaurant, hour);
-                if (timeSlot == null) {
-                    // 운영 시간대 매핑에 없으면 시간 단위로라도 묶어서 보여줌
-                    timeSlot = String.format("%02d시", hour);
-                }
+                if (timeSlot == null) continue; // 운영 시간 밖 데이터는 통계 제외
 
                 // 집계
                 String displayName = canonicalizeRestaurantName(restaurantId, restaurant);
@@ -190,17 +187,18 @@ public class PaymentDAO {
         switch (key) {
             case "stdCafeteria": // 학생식당
                 if (hour >= 8 && hour < 10) return "아침";
-                if (hour >= 11 && hour < 13) return "점심";
+                if (hour >= 11 && hour < 15) return "점심";
+                if (hour >= 17 && hour < 20) return "저녁";
                 return null;
 
             case "facCafeteria": // 교직원식당
-                if (hour >= 11 && hour < 13) return "점심";
-                if (hour >= 17 && hour < 18) return "저녁";
+                if (hour >= 11 && hour < 15) return "점심";
+                if (hour >= 17 && hour < 20) return "저녁";
                 return null;
 
             case "snack": // 분식당
-                if (hour >= 11 && hour < 14) return "점심";
-                if (hour >= 16 && hour < 18) return "저녁";
+                if (hour >= 11 && hour < 15) return "점심";
+                if (hour >= 16 && hour < 20) return "저녁";
                 return null;
 
             default:
@@ -222,6 +220,7 @@ public class PaymentDAO {
         // 이름 기반 보정 (대소문자/한글 호환)
         switch (name) {
             case "stdcafeteria":
+            case "stucafeteria":
             case "학생식당":
                 return "stdCafeteria";
             case "faccafeteria":
