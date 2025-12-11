@@ -25,6 +25,16 @@ public class PaymentController {
         if (menu == null) {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "존재하지 않는 메뉴입니다.");
         }
+        // 1-0. 학생 식당(ID: 1)은 학생만 이용 가능
+        if (menu.getRestaurantId() == 1) {
+            String type = request.getUserType();
+            // DB에 저장된 타입이 한글("학생")인지 영어("student")인지 모두 대응
+            boolean isStudent = "학생".equals(type) || "student".equalsIgnoreCase(type);
+
+            if (!isStudent) {
+                return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "학생 식당은 학생만 이용 가능합니다.");
+            }
+        }
         // 1-1. 메뉴 날짜 유효성 체크 (DB 시간 기준)
         if (!menuPriceDAO.isMenuDateValid(request.getMenuPriceId())) {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, "해당 메뉴는 오늘 제공되지 않습니다.");
