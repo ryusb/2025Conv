@@ -112,7 +112,7 @@ public class PaymentDAO {
     public Map<String, Long> getSalesStatsByRestaurant() {
         Map<String, Long> stats = new HashMap<>();
         String sql = "SELECT restaurant_name, SUM(coupon_value_used + additional_card_amount) as total_sales " +
-                "FROM payment WHERE status = '성공' GROUP BY restaurant_name";
+                "FROM payment WHERE status <> '실패' GROUP BY restaurant_name";
 
         try (Connection conn = DBConnectionManager.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
@@ -131,8 +131,8 @@ public class PaymentDAO {
     // 반환 예시: "12시: 학생식당 (15건)", "12시: 교직원식당 (8건)"
     public List<String> getTimeSlotUsageStats() {
 
-        String sql = "SELECT HOUR(payment_time) AS hour_slot, restaurant_name " +
-                "FROM payment WHERE status='성공'";
+        String sql = "SELECT HOUR(payment_time) AS hour_slot, restaurant_id, restaurant_name " +
+                "FROM payment WHERE status <> '실패'";
 
         // 식당별 → 시간대별 집계 Map
         Map<String, Map<String, Integer>> stats = new LinkedHashMap<>();
@@ -143,15 +143,20 @@ public class PaymentDAO {
 
             while (rs.next()) {
                 int hour = rs.getInt("hour_slot");
+                int restaurantId = rs.getInt("restaurant_id");
                 String restaurant = rs.getString("restaurant_name");
 
                 // 시간대 구하기
-                String timeSlot = getMealTimeSlot(restaurant, hour);
-                if (timeSlot == null) continue; // 해당 식당에 해당되지 않는 시간대는 skip
+                String timeSlot = getMealTimeSlot(restaurantId, restaurant, hour);
+                if (timeSlot == null) {
+                    // 운영 시간대 매핑에 없으면 시간 단위로라도 묶어서 보여줌
+                    timeSlot = String.format("%02d시", hour);
+                }
 
                 // 집계
+                String displayName = canonicalizeRestaurantName(restaurantId, restaurant);
                 stats
-                        .computeIfAbsent(restaurant, k -> new LinkedHashMap<>())
+                        .computeIfAbsent(displayName, k -> new LinkedHashMap<>())
                         .merge(timeSlot, 1, Integer::sum);
             }
 
@@ -179,10 +184,10 @@ public class PaymentDAO {
     // ---------------------------------------------------
 // 식당별 운영 시간대 매핑 함수
 // ---------------------------------------------------
-    private String getMealTimeSlot(String restaurant, int hour) {
+    private String getMealTimeSlot(int restaurantId, String restaurantName, int hour) {
+        String key = normalizeRestaurantKey(restaurantId, restaurantName);
 
-        switch (restaurant) {
-
+        switch (key) {
             case "stdCafeteria": // 학생식당
                 if (hour >= 8 && hour < 10) return "아침";
                 if (hour >= 11 && hour < 13) return "점심";
@@ -197,9 +202,65 @@ public class PaymentDAO {
                 if (hour >= 11 && hour < 14) return "점심";
                 if (hour >= 16 && hour < 18) return "저녁";
                 return null;
+
+            default:
+                return null;
+        }
+    }
+
+    private String normalizeRestaurantKey(int restaurantId, String restaurantName) {
+        String name = (restaurantName == null) ? "" : restaurantName.trim().toLowerCase();
+
+        // ID 기반 우선 매핑
+        switch (restaurantId) {
+            case 1: return "stdCafeteria";
+            case 2: return "facCafeteria";
+            case 3: return "snack";
+            default: break;
         }
 
-        return null;
+        // 이름 기반 보정 (대소문자/한글 호환)
+        switch (name) {
+            case "stdcafeteria":
+            case "학생식당":
+                return "stdCafeteria";
+            case "faccafeteria":
+            case "교직원식당":
+                return "facCafeteria";
+            case "snack":
+            case "분식당":
+                return "snack";
+            default:
+                return restaurantName == null ? "" : restaurantName.trim();
+        }
+    }
+
+    private String canonicalizeRestaurantName(int restaurantId, String restaurantName) {
+        if (restaurantName != null && !restaurantName.isBlank()) {
+            String trimmed = restaurantName.trim();
+            String lower = trimmed.toLowerCase();
+            switch (lower) {
+                case "stdcafeteria":
+                case "학생식당":
+                    return "학생식당";
+                case "faccafeteria":
+                case "교직원식당":
+                    return "교직원식당";
+                case "snack":
+                case "분식당":
+                    return "분식당";
+                default:
+                    return trimmed;
+            }
+        }
+
+        // 이름이 비어 있을 경우 ID 기반 기본값
+        switch (restaurantId) {
+            case 1: return "학생식당";
+            case 2: return "교직원식당";
+            case 3: return "분식당";
+            default: return "식당#" + restaurantId;
+        }
     }
 
 
