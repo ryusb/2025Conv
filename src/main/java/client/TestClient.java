@@ -451,8 +451,8 @@ public class TestClient {
     private static void testMenuInsert() throws IOException {
         System.out.println("\n[관리자: 메뉴 등록]");
         MenuPriceDTO m = new MenuPriceDTO();
-        System.out.print("식당 ID: "); m.setRestaurantId(getIntInput());
-        System.out.print("식당 이름: "); m.setRestaurantName(sc.nextLine());
+        System.out.print("식당 ID(1: 학생식당 /2: 교직원식당 /3: 분식당): "); m.setRestaurantId(getIntInput());
+        System.out.print("식당 이름(학생식당: stdCafeteria/교직원식당: facCafeteria/분식당: snack)"); m.setRestaurantName(sc.nextLine());
         System.out.print("메뉴명: "); m.setMenuName(sc.nextLine());
         System.out.print("시간대(아침/점심/저녁/상시): "); m.setMealTime(sc.nextLine());
         System.out.print("학기명: "); m.setSemesterName(sc.nextLine());
