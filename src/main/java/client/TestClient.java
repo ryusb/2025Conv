@@ -755,13 +755,65 @@ public class TestClient {
 
     // 0x19: 이용 현황
     private static void testUsageReport() throws IOException {
+        // 식당 선택 후 해당 식당 통계만 출력 (전체 요청 후 클라이언트에서 필터링)
+        RestaurantDTO selected = selectRestaurant();
+        if (selected == null) return;
+
+        String displayName = canonicalizeRestaurantName(selected.getName());
+
         send(new Protocol(ProtocolType.REQUEST, ProtocolCode.USAGE_REPORT_REQUEST, null));
         Protocol res = receive();
         if(res.getCode() == ProtocolCode.TIME_STATS_RESPONSE) {
             List<String> stats = (List<String>) res.getData();
             System.out.println("📊 시간대별 통계:");
-            stats.forEach(System.out::println);
+            printRestaurantStats(stats, displayName);
         } else printFail(res);
+    }
+
+    // [시간대 통계] 식당명 통일 (서버 canonicalizeRestaurantName과 동일한 규칙 사용)
+    private static String canonicalizeRestaurantName(String restaurantName) {
+        if (restaurantName == null || restaurantName.isBlank()) return "";
+        String trimmed = restaurantName.trim();
+        String lower = trimmed.toLowerCase();
+        switch (lower) {
+            case "stdcafeteria":
+            case "학생식당":
+                return "학생식당";
+            case "faccafeteria":
+            case "교직원식당":
+                return "교직원식당";
+            case "snack":
+            case "분식당":
+                return "분식당";
+            default:
+                return trimmed;
+        }
+    }
+
+    // [시간대 통계] 선택한 식당 섹션만 출력
+    private static void printRestaurantStats(List<String> stats, String displayName) {
+        String header = "[" + displayName + "]";
+        boolean inSection = false;
+        boolean printed = false;
+
+        for (String line : stats) {
+            if (line == null) continue;
+            if (line.startsWith("[")) {
+                inSection = line.equals(header);
+                continue;
+            }
+            if (inSection) {
+                if (line.isBlank()) {
+                    break;
+                }
+                System.out.println(line);
+                printed = true;
+            }
+        }
+
+        if (!printed) {
+            System.out.println("(해당 식당 통계 없음)");
+        }
     }
 
     // 0x20: CSV 샘플 다운로드
