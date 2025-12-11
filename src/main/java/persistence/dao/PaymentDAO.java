@@ -16,33 +16,33 @@ public class PaymentDAO {
     public boolean insertPayment(PaymentDTO payment) {
         String sql = "INSERT INTO payment (user_id, user_type, payment_time, restaurant_id, restaurant_name, " +
                 "menu_price_id, menu_name, menu_price_at_time, used_coupon_id, coupon_value_used, " +
-                "additional_card_amount, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "additional_card_amount, status) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DBConnectionManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             pstmt.setInt(1, payment.getUserId());
             pstmt.setString(2, payment.getUserType());
-            // LocalDateTime 처리 (MySQL DATETIME 변환)
-            pstmt.setTimestamp(3, Timestamp.valueOf(payment.getPaymentTime()));
-            pstmt.setInt(4, payment.getRestaurantId());
-            pstmt.setString(5, payment.getRestaurantName());
-            pstmt.setInt(6, payment.getMenuPriceId());
-            pstmt.setString(7, payment.getMenuName());
-            pstmt.setInt(8, payment.getMenuPriceAtTime());
-
-            // used_coupon_id는 NULL 가능하므로 setObject/setNull 사용
-            if (payment.getUsedCouponId() != null) {
-                pstmt.setInt(9, payment.getUsedCouponId());
-            } else {
-                pstmt.setNull(9, Types.INTEGER);
-            }
-
-            pstmt.setInt(10, payment.getCouponValueUsed());
-            pstmt.setInt(11, payment.getAdditionalCardAmount());
-            pstmt.setString(12, payment.getStatus());
+            pstmt.setInt(3, payment.getRestaurantId());
+            pstmt.setString(4, payment.getRestaurantName());
+            pstmt.setInt(5, payment.getMenuPriceId());
+            pstmt.setString(6, payment.getMenuName());
+            pstmt.setInt(7, payment.getMenuPriceAtTime());
+            if (payment.getUsedCouponId() != null) pstmt.setInt(8, payment.getUsedCouponId());
+            else pstmt.setNull(8, Types.INTEGER);
+            pstmt.setInt(9, payment.getCouponValueUsed());
+            pstmt.setInt(10, payment.getAdditionalCardAmount());
+            pstmt.setString(11, payment.getStatus());
 
             int rowsAffected = pstmt.executeUpdate();
+
+            if (rowsAffected > 0) {
+                try (ResultSet rs = pstmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        payment.setPaymentId(rs.getInt(1)); // DTO에 ID 저장
+                    }
+                }
+            }
             return rowsAffected > 0;
 
         } catch (SQLException e) {
