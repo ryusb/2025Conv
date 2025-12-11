@@ -83,11 +83,12 @@ public class Serializer {
 
         if (obj instanceof byte[]) {
             byte[] arr = (byte[]) obj;
-            // 배열 길이(4바이트) + 본문(N바이트) 구조로 리턴
-            ArrayList<Byte> result = new ArrayList<>();
-            addArrList(result, intToByteArray(arr.length));
-            addArrList(result, arr);
-            return byteListToArray(result);
+            byte[] lenBytes = intToByteArray(arr.length);
+            byte[] result = new byte[lenBytes.length + arr.length];
+
+            System.arraycopy(lenBytes, 0, result, 0, lenBytes.length);
+            System.arraycopy(arr, 0, result, lenBytes.length, arr.length);
+            return result;
         }
 
         // 기본 타입 처리
@@ -141,13 +142,13 @@ public class Serializer {
                         arr = doubleToByteArray((double) memberVal);
                     } else if (typeStr.equals("boolean") || typeStr.contains("Boolean")) {
                         arr = new byte[] { (byte)((Boolean)memberVal ? 1 : 0) };
-                    } else if (typeStr.contains("[B")) { // [B는 byte[]의 자바 내부 이름입니다.
+                    } else if (typeStr.contains("[B")) {
                         byte[] val = (byte[]) memberVal;
-                        // 길이 + 데이터
-                        ArrayList<Byte> temp = new ArrayList<>();
-                        addArrList(temp, intToByteArray(val.length));
-                        addArrList(temp, val);
-                        arr = byteListToArray(temp);
+                        byte[] lenBytes = intToByteArray(val.length);
+                        arr = new byte[lenBytes.length + val.length];
+
+                        System.arraycopy(lenBytes, 0, arr, 0, lenBytes.length);
+                        System.arraycopy(val, 0, arr, lenBytes.length, val.length);
                     } else if (typeStr.contains("String")) {
                         arr = stringToByteArray((String) memberVal);
                     } else if (typeStr.contains("LocalDateTime")) {
