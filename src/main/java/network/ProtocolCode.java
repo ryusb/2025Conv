@@ -18,7 +18,6 @@ public class ProtocolCode {
     public static final byte PAYMENT_COUPON_REQUEST = 0x08;      // 쿠폰 결제 요청
     public static final byte USAGE_HISTORY_REQUEST = 0x09;       // 이용 내역 조회 요청
     public static final byte COUPON_PURCHASE_HISTORY_REQUEST = 0x0A; // 쿠폰 구매 내역 조회
-    public static final byte RESTAURANT_LIST_REQUEST = 0x0B;     // 식당 목록 조회
 
     // II. 관리자 - 메뉴/가격 관리 (0x10 ~ 0x14)
     public static final byte MENU_INSERT_REQUEST = 0x10;         // 메뉴 등록 요청
@@ -55,7 +54,6 @@ public class ProtocolCode {
     public static final byte TIME_STATS_RESPONSE = 0x3A;         // 시간대별 통계(List<String>) 반환
     public static final byte CSV_FILE_RESPONSE = 0x3B;           // CSV 파일 반환
     public static final byte COUPON_PURCHASE_HISTORY_RESPONSE = 0x3C;   // 쿠폰 구매 내역 응답
-    public static final byte RESTAURANT_LIST_RESPONSE = 0x3D;    // 식당 목록 응답
 
     // -----------------------------------------------------------
     // Type: RESULT (범용 성공/실패/오류) - 0x50번대 사용

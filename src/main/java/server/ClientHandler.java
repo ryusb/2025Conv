@@ -14,7 +14,6 @@ import network.ProtocolType;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import persistence.dao.PaymentDAO;
-import persistence.dao.RestaurantDAO;
 import persistence.dao.UserDAO;
 import persistence.dto.*;
 
@@ -29,7 +28,6 @@ public class ClientHandler extends Thread {
     private final PriceController priceController = new PriceController();
     private final UserDAO userDAO = new UserDAO();
     private final PaymentDAO paymentDAO = new PaymentDAO();
-    private final RestaurantDAO restaurantDAO = new RestaurantDAO();
 
     private UserDTO loginUser = null;
 
@@ -198,11 +196,6 @@ public class ClientHandler extends Thread {
                 case ProtocolCode.COUPON_PURCHASE_HISTORY_REQUEST: { // 0x0A
                     int userId = (int) req.getData();
                     return couponController.getCouponPurchaseHistory(userId);
-                }
-
-                case ProtocolCode.RESTAURANT_LIST_REQUEST: { // 0x0B
-                    List<RestaurantDTO> list = restaurantDAO.findAllRestaurants();
-                    return new Protocol(ProtocolType.RESPONSE, ProtocolCode.RESTAURANT_LIST_RESPONSE, list);
                 }
 
                 // ==========================================
