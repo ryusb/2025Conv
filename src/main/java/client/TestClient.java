@@ -27,7 +27,6 @@ public class TestClient {
     private static OutputStream os;
     private static Scanner sc = new Scanner(System.in);
 
-    // 현재 로그인한 유저 정보 (테스트용)
     private static UserDTO currentUser;
 
     public static void main(String[] args) {
@@ -466,7 +465,12 @@ public class TestClient {
             }
             System.out.println("--- [메뉴 선택] ---");
             for (MenuPriceDTO m : list) {
-                System.out.printf("[%d] %s\n", m.getMenuPriceId(), m.getMenuName());
+                if (currentUser.getUserType().equals("student")) {
+                    System.out.printf("[%d] %s - %d\n", m.getMenuPriceId(), m.getMenuName(), m.getPriceStu());
+                }
+                else {
+                    System.out.printf("[%d] %s - %d\n", m.getMenuPriceId(), m.getMenuName(), m.getPriceFac());
+                }
             }
             System.out.print("메뉴 ID 입력: ");
             int mid = getIntInput();
@@ -688,25 +692,38 @@ public class TestClient {
 
     // 0x13, 0x14: 가격 등록
     private static void testPriceRegister(byte code) throws IOException {
-        System.out.println("\n[관리자: 가격 등록 (" + (code==0x13?"분식":"일괄") + ")]");
+        System.out.println("\n[관리자: 가격 등록 (" + (code == ProtocolCode.PRICE_REGISTER_SNACK_REQUEST ? "분식" : "일괄") + ")]");
         MenuPriceDTO m = new MenuPriceDTO();
-        System.out.print("식당 ID: "); m.setRestaurantId(getIntInput());
+        RestaurantDTO r = null;
+        if (code == ProtocolCode.PRICE_REGISTER_SNACK_REQUEST) {
+            send(new Protocol(ProtocolType.REQUEST, ProtocolCode.RESTAURANT_LIST_REQUEST, null));
+            Protocol res = receive();
+            if (res.getCode() == ProtocolCode.RESTAURANT_LIST_RESPONSE) {
+                List<RestaurantDTO> list = (List<RestaurantDTO>) res.getData();
+                for (RestaurantDTO restaurantDTO : list) {
+                    if (restaurantDTO.getRestaurantId() == 3)
+                        r = restaurantDTO;
+                }
+            }
+        } else {
+            r = selectRestaurant();
+        }
+        if (r == null) return;
+        m.setRestaurantId(r.getRestaurantId());
+        m.setRestaurantName(r.getName());
         System.out.print("학기명: "); m.setSemesterName(sc.nextLine());
         m.setCurrentSemester(true);
-        System.out.print("학생가: "); m.setPriceStu(getIntInput());
-        System.out.print("교직원가: "); m.setPriceFac(getIntInput());
-
         if (code == ProtocolCode.PRICE_REGISTER_SNACK_REQUEST) {
             System.out.print("메뉴명: "); m.setMenuName(sc.nextLine());
-            System.out.print("식당명: "); m.setRestaurantName(sc.nextLine());
-            System.out.print("시간대: "); m.setMealTime(sc.nextLine());
         }
+        System.out.print("학생가: "); m.setPriceStu(getIntInput());
+        System.out.print("교직원가: "); m.setPriceFac(getIntInput());
 
         send(new Protocol(ProtocolType.REQUEST, code, m));
         printSimpleResult(receive());
     }
 
-    // 0x15: 쿠폰 정책 목록
+    // 쿠폰 정책 목록
     private static void testCouponPolicyList() throws IOException {
         send(new Protocol(ProtocolType.REQUEST, ProtocolCode.COUPON_POLICY_LIST_REQUEST, null));
         Protocol res = receive();
