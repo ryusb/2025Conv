@@ -8,7 +8,6 @@ import persistence.dto.*;
 import java.io.*;
 import java.net.Socket;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -226,15 +225,14 @@ public class TestClient {
     private static void handlePriceManagement() throws IOException {
         while (true) {
             System.out.println("\n--- [관리자 > 가격 책정] ---");
-            System.out.println(" 1. 분식당 개별 가격 등록");
-            System.out.println(" 2. 일반식당(학식/교직원) 일괄 가격 등록");
+            // System.out.println(" 1. 분식당 개별 가격 등록");
+            System.out.println(" 1. 식당 일괄 가격 등록");
             System.out.println(" 0. 뒤로가기");
             System.out.print("선택>> ");
             int c = getIntInput();
             if (c == 0) return;
             switch (c) {
-                case 1: testPriceRegister(ProtocolCode.PRICE_REGISTER_SNACK_REQUEST); break;
-                case 2: testPriceRegister(ProtocolCode.PRICE_REGISTER_REGULAR_REQUEST); break;
+                case 1: testPriceRegister(ProtocolCode.PRICE_REGISTER_REGULAR_REQUEST); break;
                 default: System.out.println("잘못된 선택");
             }
         }
@@ -692,30 +690,14 @@ public class TestClient {
 
     // 0x13, 0x14: 가격 등록
     private static void testPriceRegister(byte code) throws IOException {
-        System.out.println("\n[관리자: 가격 등록 (" + (code == ProtocolCode.PRICE_REGISTER_SNACK_REQUEST ? "분식" : "일괄") + ")]");
+        System.out.println("\n[관리자: 가격 일괄 변경 등록]");
         MenuPriceDTO m = new MenuPriceDTO();
-        RestaurantDTO r = null;
-        if (code == ProtocolCode.PRICE_REGISTER_SNACK_REQUEST) {
-            send(new Protocol(ProtocolType.REQUEST, ProtocolCode.RESTAURANT_LIST_REQUEST, null));
-            Protocol res = receive();
-            if (res.getCode() == ProtocolCode.RESTAURANT_LIST_RESPONSE) {
-                List<RestaurantDTO> list = (List<RestaurantDTO>) res.getData();
-                for (RestaurantDTO restaurantDTO : list) {
-                    if (restaurantDTO.getRestaurantId() == 3)
-                        r = restaurantDTO;
-                }
-            }
-        } else {
-            r = selectRestaurant();
-        }
+        RestaurantDTO r = selectRestaurant();
         if (r == null) return;
         m.setRestaurantId(r.getRestaurantId());
         m.setRestaurantName(r.getName());
         System.out.print("학기명: "); m.setSemesterName(sc.nextLine());
         m.setCurrentSemester(true);
-        if (code == ProtocolCode.PRICE_REGISTER_SNACK_REQUEST) {
-            System.out.print("메뉴명: "); m.setMenuName(sc.nextLine());
-        }
         System.out.print("학생가: "); m.setPriceStu(getIntInput());
         System.out.print("교직원가: "); m.setPriceFac(getIntInput());
 
