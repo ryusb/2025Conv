@@ -70,6 +70,46 @@ public class PaymentDAO {
         });
     }
 
+    // 식당별 + 특정 연/월 결제 내역 조회
+    public List<PaymentDTO> findHistoryByRestaurantIdAndDate(int restaurantId, int year, int month) {
+        // YEAR()와 MONTH() 함수를 사용하여 날짜 필터링
+        String sql = "SELECT * FROM payment WHERE restaurant_id = ? " +
+                "AND YEAR(payment_time) = ? AND MONTH(payment_time) = ? " +
+                "ORDER BY payment_time DESC";
+
+        return getPaymentList(sql, pstmt -> {
+            pstmt.setInt(1, restaurantId);
+            pstmt.setInt(2, year);
+            pstmt.setInt(3, month);
+        });
+    }
+
+    // 특정 연/월 식당별 매출 현황
+    public Map<String, Long> getSalesStatsByRestaurantAndDate(int year, int month) {
+        Map<String, Long> stats = new HashMap<>();
+        String sql = "SELECT restaurant_name, SUM(coupon_value_used + additional_card_amount) as total_sales " +
+                "FROM payment " +
+                "WHERE status <> '실패' " +
+                "AND YEAR(payment_time) = ? AND MONTH(payment_time) = ? " +
+                "GROUP BY restaurant_name";
+
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, year);
+            pstmt.setInt(2, month);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    stats.put(rs.getString("restaurant_name"), rs.getLong("total_sales"));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("PaymentDAO - 월별 매출 현황 오류: " + e.getMessage());
+        }
+        return stats;
+    }
+
     // [공통] ResultSet -> PaymentDTO 변환 및 리스트 반환 헬퍼 메서드
     private List<PaymentDTO> getPaymentList(String sql, StatementSetter setter) {
         List<PaymentDTO> list = new ArrayList<>();
@@ -131,9 +171,8 @@ public class PaymentDAO {
     // 반환 예시: "12시: 학생식당 (15건)", "12시: 교직원식당 (8건)"
     public List<String> getTimeSlotUsageStats() {
 
-        String sql = "SELECT HOUR(p.payment_time) AS hour_slot, p.restaurant_id, p.restaurant_name, mp.meal_time " +
-                "FROM payment p " +
-                "LEFT JOIN menu_price mp ON p.menu_price_id = mp.menu_price_id";
+        String sql = "SELECT HOUR(p.payment_time) AS hour_slot, p.restaurant_id, p.restaurant_name " +
+                "FROM payment p";
 
         // 식당별 → 시간대별 집계 Map
         Map<String, Map<String, Integer>> stats = new LinkedHashMap<>();
@@ -145,12 +184,11 @@ public class PaymentDAO {
             while (rs.next()) {
                 int restaurantId = rs.getInt("restaurant_id");
                 String restaurant = rs.getString("restaurant_name");
-                String mealTime = rs.getString("meal_time");
                 int hourSlot = rs.getInt("hour_slot");
 
-                // 시간대 구하기
-                String timeSlot = getMealTimeSlot(restaurantId, restaurant, mealTime, hourSlot);
-                if (timeSlot == null) continue; // 운영 시간 밖 데이터는 통계 제외
+                // 시간대 구하기 (모든 식당을 주문 시각 기준으로 집계)
+                String timeSlot = getMealTimeSlot(restaurantId, restaurant, hourSlot);
+                if (timeSlot == null) continue;
 
                 // 집계
                 String displayName = canonicalizeRestaurantName(restaurantId, restaurant);
@@ -181,33 +219,10 @@ public class PaymentDAO {
 
 
 // ---------------------------------------------------
-// 식당별 운영 시간대 매핑 함수
+// 시간대 매핑 함수 (모든 식당을 주문 시각 기준으로 집계)
 // ---------------------------------------------------
-private String getMealTimeSlot(int restaurantId, String restaurantName, String mealTime, int hourSlot) {
-    String key = normalizeRestaurantKey(restaurantId, restaurantName);
-    String mt = (mealTime == null ? "" : mealTime.trim().toLowerCase());
-
-    switch (key) {
-        case "stdCafeteria": // 학생식당
-            if (mt.equals("opt1")) return "아침";
-            if (mt.equals("opt2")) return "점심";
-            // 학생식당은 opt0 사용 금지 -> 무시 (null 리턴)
-            return null;
-
-        case "facCafeteria": // 교직원식당
-            if (mt.equals("opt1")) return "점심";
-            if (mt.equals("opt2")) return "저녁";
-            // 교직원식당은 opt0 사용 금지 -> 무시 (null 리턴)
-            return null;
-
-        case "snack": // 분식당만 시간 기반 허용
-            return String.format("%02d시", hourSlot);
-
-        default:
-            break;
-    }
-
-    return null;
+private String getMealTimeSlot(int restaurantId, String restaurantName, int hourSlot) {
+    return String.format("%02d시", hourSlot);
 }
 
 
