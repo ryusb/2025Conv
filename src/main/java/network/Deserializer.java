@@ -168,7 +168,6 @@ public class Deserializer {
 
         Object result = c.getConstructor().newInstance();
         Field[] member = c.getDeclaredFields();
-
         Arrays.sort(member, Comparator.comparing(Field::getName));
 
         for (int i = 0; i < member.length; i++) {
@@ -181,6 +180,7 @@ public class Deserializer {
                 }
 
                 String typeStr = member[i].getType().toString();
+
                 if (typeStr.equals("int") || typeStr.contains("Integer")) {
                     byte[] arr = new byte[INT_LENGTH];
                     System.arraycopy(objInfo, idx, arr, 0, INT_LENGTH); idx += INT_LENGTH;
@@ -218,8 +218,18 @@ public class Deserializer {
                     System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int minute = byteArrayToInt(buf);
                     System.arraycopy(objInfo, idx, buf, 0, INT_LENGTH); idx += INT_LENGTH; int second = byteArrayToInt(buf);
                     member[i].set(result, LocalTime.of(hour, minute, second));
+
+                } else if (typeStr.contains("[B")) {
+                    // [🔥추가됨] 바이트 배열(byte[]) 필드 처리 로직
+                    byte[] lenBytes = new byte[INT_LENGTH];
+                    System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
+                    int len = byteArrayToInt(lenBytes);
+                    byte[] data = new byte[len];
+                    System.arraycopy(objInfo, idx, data, 0, len); idx += len;
+                    member[i].set(result, data);
+
                 } else {
-                    // DTO 필드 복원 (재귀)
+                    // 그 외 DTO 타입 등 (재귀 처리)
                     byte[] lenBytes = new byte[INT_LENGTH];
                     System.arraycopy(objInfo, idx, lenBytes, 0, INT_LENGTH); idx += INT_LENGTH;
                     int len = byteArrayToInt(lenBytes);
@@ -234,23 +244,14 @@ public class Deserializer {
 
 
     public static int byteArrayToInt(byte[] arr) {
-        return (int)(
-                (0xff & arr[0]) << 8*3 |
-                        (0xff & arr[1]) << 8*2 |
-                        (0xff & arr[2]) << 8*1 |
-                        (0xff & arr[3]) << 8*0
-        );
+        return (int)((0xff & arr[0]) << 24 | (0xff & arr[1]) << 16 | (0xff & arr[2]) << 8 | (0xff & arr[3]));
     }
-
     public static long byteArrayToLong(byte[] arr) {
-        return (long)( (0xff & arr[0]) << 8*7 | (0xff & arr[1]) << 8*6 | (0xff & arr[2]) << 8*5 |
-                (0xff & arr[3]) << 8*4 | (0xff & arr[4]) << 8*3 | (0xff & arr[5]) << 8*2 |
-                (0xff & arr[6]) << 8 | (0xff & arr[7]));
+        return (long)((0xff & arr[0]) << 56 | (0xff & arr[1]) << 48 | (0xff & arr[2]) << 40 | (0xff & arr[3]) << 32 |
+                (0xff & arr[4]) << 24 | (0xff & arr[5]) << 16 | (0xff & arr[6]) << 8 | (0xff & arr[7]));
     }
-
     public static double byteArrayToDouble(byte[] arr){
-        return (double)( (0xff & arr[0]) << 8*7 | (0xff & arr[1]) << 8*6 | (0xff & arr[2]) << 8*5 |
-                (0xff & arr[3]) << 8*4 | (0xff & arr[4]) << 8*3 | (0xff & arr[5]) << 8*2 |
-                (0xff & arr[6]) << 8 | (0xff & arr[7]));
+        long bits = byteArrayToLong(arr);
+        return Double.longBitsToDouble(bits);
     }
 }
