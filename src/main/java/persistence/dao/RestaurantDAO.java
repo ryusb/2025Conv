@@ -8,6 +8,29 @@ import java.util.List;
 
 public class RestaurantDAO {
 
+    // [추가됨] DB 시간 기준으로 현재 식당이 영업 중인지 확인
+    public boolean isOpenNow(int restaurantId) {
+        // CURRENT_TIME(): DB 서버의 현재 시각 함수
+        String sql = "SELECT 1 FROM restaurant WHERE restaurant_id = ? " +
+                "AND ( " +
+                "  (CURRENT_TIME() >= open_time1 AND CURRENT_TIME() <= close_time1) " +
+                "  OR " +
+                "  (CURRENT_TIME() >= open_time2 AND CURRENT_TIME() <= close_time2) " +
+                ")";
+
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, restaurantId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next(); // 결과가 있으면(조건에 맞으면) 영업 중
+            }
+        } catch (SQLException e) {
+            System.err.println("RestaurantDAO - 영업 시간 확인 오류: " + e.getMessage());
+            return false;
+        }
+    }
+
     // 모든 식당 목록을 조회
     public List<RestaurantDTO> findAllRestaurants() {
         List<RestaurantDTO> restaurantList = new ArrayList<>();
@@ -70,5 +93,18 @@ public class RestaurantDAO {
             System.err.println("RestaurantDAO - 식당 조회 오류: " + e.getMessage());
         }
         return restaurant;
+    }
+
+    public int findRestaurantIdByName(String name) {
+        String sql = "SELECT restaurant_id FROM restaurant WHERE name = ?";
+        int id = -1;
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, name);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) id = rs.getInt("restaurant_id");
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return id;
     }
 }
