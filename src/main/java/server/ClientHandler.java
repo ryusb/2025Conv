@@ -143,13 +143,47 @@ public class ClientHandler extends Thread {
 
                 case ProtocolCode.MENU_LIST_REQUEST: { // 0x03
                     Object data = req.getData();
-                    if (data == null || !(data instanceof MenuPriceDTO)) {
+                    int restId = 1;
+                    String mealTime = null;
+                    String menuDate = null;
+                    Integer menuPriceId = null;
+
+                    if (data instanceof String s) {
+                        restId = mapRestaurantCodeToId(s);
+                    } else if (data instanceof Integer i) {
+                        menuPriceId = i;
+                    } else if (data instanceof Map<?, ?> map) {
+                        Object rid = map.get("restaurantId");
+                        if (rid instanceof Integer) restId = (Integer) rid;
+                        Object mt = map.get("mealTime");
+                        if (mt instanceof String) mealTime = (String) mt;
+                        Object md = map.get("menuDate");
+                        if (md instanceof String) menuDate = (String) md;
+                    } else if (data instanceof MenuPriceDTO dto) {
+                        restId = dto.getRestaurantId();
+                        mealTime = dto.getMealTime();
+                        menuDate = dto.getMenuDate();
+                    } else {
                         return new Protocol(ProtocolType.RESULT, ProtocolCode.INVALID_INPUT, null);
                     }
-                    MenuPriceDTO inputDto = (MenuPriceDTO) data;
-                    int restId = inputDto.getRestaurantId();
-                    String time = inputDto.getMealTime();
-                    List<MenuPriceDTO> menus = menuController.getMenus(restId, time);
+
+                    // 단건 상세 요청 (order 화면 재사용)
+                    if (menuPriceId != null && menuPriceId > 0) {
+                        MenuPriceDTO menu = menuController.getMenuById(menuPriceId);
+                        if (menu == null) {
+                            return new Protocol(ProtocolType.RESULT, ProtocolCode.NOT_FOUND, null);
+                        }
+                        return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_LIST_RESPONSE, menu);
+                    }
+
+                    List<MenuPriceDTO> menus;
+                    if (menuDate != null && !menuDate.isBlank()) {
+                        menus = menuController.getMenusByRestaurantAndDate(restId, menuDate);
+                    } else if (mealTime != null && !mealTime.isBlank()) {
+                        menus = menuController.getMenus(restId, mealTime);
+                    } else {
+                        menus = menuController.getMenusByRestaurant(restId);
+                    }
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.MENU_LIST_RESPONSE, menus);
                 }
 
@@ -343,5 +377,14 @@ public class ClientHandler extends Thread {
             System.err.println("날짜 파싱 실패: " + text);
             return null;
         }
+    }
+
+    private int mapRestaurantCodeToId(String code) {
+        return switch (code) {
+            case "stdCafeteria", "학생식당", "student" -> 1;
+            case "facCafeteria", "교직원식당", "faculty" -> 2;
+            case "snack", "분식당" -> 3;
+            default -> 1;
+        };
     }
 }

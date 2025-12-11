@@ -32,8 +32,9 @@ public class AdminService {
                 case 3 -> System.out.println("");
                 case 4 -> couponPolicyMenu();
                 case 5 -> paymentHistoryMenu();
-                case 6 -> System.out.println("");
-                case 7 -> isRunning = false;
+                case 6 -> menuListMenu();
+                case 7 -> System.out.println("");
+                case 8 -> isRunning = false;
                 default -> OutputHandler.showError("잘못된 선택입니다");
             }
         }
@@ -103,6 +104,43 @@ public class AdminService {
             OutputHandler.showSuccess("정책이 등록되었습니다.");
         } else {
             OutputHandler.showError("정책 등록 실패");
+        }
+    }
+
+    private static void menuListMenu() {
+        OutputHandler.showTitle("메뉴 목록 조회 (전체 식당)");
+
+        for (int restaurantId = 1; restaurantId <= 3; restaurantId++) {
+            String restaurantName = mapRestaurantName(restaurantId);
+            // 식당 ID만 담은 DTO로 요청 (불필요한 필터 없이 전체)
+            MenuPriceDTO dto = new MenuPriceDTO();
+            dto.setRestaurantId(restaurantId);
+
+            Protocol res = sendRequest(new Protocol(ProtocolType.REQUEST, ProtocolCode.MENU_LIST_REQUEST, dto));
+            if (res == null || res.getCode() != ProtocolCode.MENU_LIST_RESPONSE) {
+                OutputHandler.showError(restaurantName + " 조회 실패");
+                continue;
+            }
+
+            @SuppressWarnings("unchecked")
+            List<MenuPriceDTO> list = (List<MenuPriceDTO>) res.getData();
+            OutputHandler.showTitle(restaurantName);
+            if (list == null || list.isEmpty()) {
+                OutputHandler.showMessage("-");
+                continue;
+            }
+
+            for (MenuPriceDTO m : list) {
+                String dateStr = "-";
+                if (m.getMenuDate() != null && !m.getMenuDate().isBlank()) {
+                    dateStr = m.getMenuDate();
+                } else if (m.getDate() != null) {
+                    dateStr = m.getDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                }
+                String name = (m.getMenuName() == null || m.getMenuName().isBlank()) ? "-" : m.getMenuName();
+                int id = m.getMenuPriceId();
+                OutputHandler.showMessage(dateStr + " | " + name + " | id=" + id);
+            }
         }
     }
 
@@ -207,8 +245,9 @@ public class AdminService {
         OutputHandler.showMenu(3, "메뉴 사진 등록");
         OutputHandler.showMenu(4, "쿠폰 관리");
         OutputHandler.showMenu(5, "현황 조회");
-        OutputHandler.showMenu(6, "CSV 관리");
-        OutputHandler.showMenu(7, "종료");
+        OutputHandler.showMenu(6, "메뉴 목록 조회");
+        OutputHandler.showMenu(7, "CSV 관리");
+        OutputHandler.showMenu(8, "종료");
         OutputHandler.showBar();
     }
 

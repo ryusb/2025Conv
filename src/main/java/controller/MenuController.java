@@ -30,6 +30,14 @@ public class MenuController {
         return menupriceDAO.findMenusByRestaurantAndDate(restaurantId, menuDate);
     }
 
+    public List<MenuPriceDTO> getMenusByRestaurant(int restaurantId) {
+        return menupriceDAO.findMenusByRestaurant(restaurantId);
+    }
+
+    public MenuPriceDTO getMenuById(int menuPriceId) {
+        return menupriceDAO.findById(menuPriceId);
+    }
+
     /**
      * menuPriceId가 0이하면 신규 등록, 그 이상이면 수정으로 처리.
      */

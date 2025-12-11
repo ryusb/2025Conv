@@ -10,43 +10,19 @@ public class MenuPriceDAO {
 
     // 현재 학기, 특정 식당, 특정 시간대의 메뉴 목록을 조회
     public List<MenuPriceDTO> findCurrentMenus(int restaurantId, String mealTime) {
-        List<MenuPriceDTO> menuList = new ArrayList<>();
-        // is_current_semester=TRUE 필터링은 Java 코드 단순화를 위해 필수적입니다.
         String sql = "SELECT * FROM menu_price WHERE restaurant_id = ? AND meal_time = ? AND is_current_semester = TRUE";
-
-        try (Connection conn = DBConnectionManager.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-
+        return getMenuPriceList(sql, pstmt -> {
             pstmt.setInt(1, restaurantId);
             pstmt.setString(2, mealTime);
-
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    MenuPriceDTO menu = new MenuPriceDTO();
-                    menu.setMenuPriceId(rs.getInt("menu_price_id"));
-                    menu.setRestaurantId(rs.getInt("restaurant_id"));
-                    menu.setRestaurantName(rs.getString("restaurant_name"));
-                    menu.setMenuName(rs.getString("menu_name"));
-                    menu.setImagePath(rs.getString("image_path"));
-                    menu.setPriceStu(rs.getInt("price_stu"));
-                    menu.setPriceFac(rs.getInt("price_fac"));
-                    // 나머지 필드 설정 생략
-
-                    menuList.add(menu);
-                }
-            }
-        } catch (SQLException e) {
-            System.err.println("MenuPriceDAO - 메뉴 조회 중 DB 오류: " + e.getMessage());
-        }
-        return menuList;
+        });
     }
 
     // 식당/날짜(옵션)/학기(옵션)/시간대(옵션)로 메뉴 목록 조회
     public List<MenuPriceDTO> findMenusByRestaurantAndDate(int restaurantId, String menuDate) {
         List<MenuPriceDTO> menuList = new ArrayList<>();
         // date 컬럼이 없을 수도 있으므로 try-catch로 감싼다. 없으면 날짜 조건을 생략한다.
-        String sqlWithDate = "SELECT menu_price_id, menu_name FROM menu_price WHERE restaurant_id = ? AND date = ?";
-        String sqlFallback = "SELECT menu_price_id, menu_name FROM menu_price WHERE restaurant_id = ?";
+        String sqlWithDate = "SELECT * FROM menu_price WHERE restaurant_id = ? AND date = ?";
+        String sqlFallback = "SELECT * FROM menu_price WHERE restaurant_id = ?";
         try (Connection conn = DBConnectionManager.getConnection()) {
             PreparedStatement pstmt;
             if (menuDate != null && !menuDate.isBlank()) {
@@ -66,16 +42,19 @@ public class MenuPriceDAO {
 
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
-                    MenuPriceDTO menu = new MenuPriceDTO();
-                    menu.setMenuPriceId(rs.getInt("menu_price_id"));
-                    menu.setMenuName(rs.getString("menu_name"));
-                    menuList.add(menu);
+                    menuList.add(mapMenuPrice(rs));
                 }
             }
         } catch (SQLException e) {
             System.err.println("MenuPriceDAO - 메뉴 목록 조회 중 DB 오류: " + e.getMessage());
         }
         return menuList;
+    }
+
+    // 식당별 전체 메뉴 조회
+    public List<MenuPriceDTO> findMenusByRestaurant(int restaurantId) {
+        String sql = "SELECT * FROM menu_price WHERE restaurant_id = ? ORDER BY date DESC";
+        return getMenuPriceList(sql, pstmt -> pstmt.setInt(1, restaurantId));
     }
     // 메뉴 신규 등록
     public boolean insertMenu(MenuPriceDTO menu) {
@@ -118,7 +97,7 @@ public class MenuPriceDAO {
     // 기존 메뉴 수정
     public boolean updateMenu(MenuPriceDTO menu) {
         String sql = "UPDATE menu_price SET restaurant_id = ?, restaurant_name = ?, semester_name = ?, is_current_semester = ?, " +
-                "meal_time = ?, menu_name = ?, price_stu = ?, price_fac = ? WHERE menu_price_id = ?";
+                "meal_time = ?, menu_name = ?, price_stu = ?, price_fac = ?, date = ? WHERE menu_price_id = ?";
 
         try (Connection conn = DBConnectionManager.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -131,7 +110,12 @@ public class MenuPriceDAO {
             pstmt.setString(6, menu.getMenuName());
             pstmt.setInt(7, menu.getPriceStu());
             pstmt.setInt(8, menu.getPriceFac());
-            pstmt.setInt(9, menu.getMenuPriceId());
+            if (menu.getDate() != null) {
+                pstmt.setTimestamp(9, Timestamp.valueOf(menu.getDate()));
+            } else {
+                pstmt.setNull(9, Types.TIMESTAMP);
+            }
+            pstmt.setInt(10, menu.getMenuPriceId());
 
             int affectedRows = pstmt.executeUpdate();
             return affectedRows > 0;
@@ -243,6 +227,43 @@ public class MenuPriceDAO {
             System.err.println("MenuPriceDAO - 단건 조회 중 DB 오류: " + e.getMessage());
             e.printStackTrace();
         }
+        return menu;
+    }
+
+    private List<MenuPriceDTO> getMenuPriceList(String sql, PaymentDAO.StatementSetter setter) {
+        List<MenuPriceDTO> list = new ArrayList<>();
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            if (setter != null) setter.setValues(pstmt);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapMenuPrice(rs));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("MenuPriceDAO - 메뉴 조회 중 DB 오류: " + e.getMessage());
+        }
+        return list;
+    }
+
+    private MenuPriceDTO mapMenuPrice(ResultSet rs) throws SQLException {
+        MenuPriceDTO menu = new MenuPriceDTO();
+        menu.setMenuPriceId(rs.getInt("menu_price_id"));
+        menu.setRestaurantId(rs.getInt("restaurant_id"));
+        menu.setRestaurantName(rs.getString("restaurant_name"));
+        menu.setSemesterName(rs.getString("semester_name"));
+        menu.setCurrentSemester(rs.getBoolean("is_current_semester"));
+        menu.setMealTime(rs.getString("meal_time"));
+        menu.setMenuName(rs.getString("menu_name"));
+        menu.setImagePath(rs.getString("image_path"));
+        Timestamp ts = null;
+        try { ts = rs.getTimestamp("date"); } catch (SQLException ignore) {}
+        if (ts != null) {
+            menu.setDate(ts.toLocalDateTime());
+            menu.setMenuDate(ts.toLocalDateTime().toLocalDate().toString());
+        }
+        menu.setPriceStu(rs.getInt("price_stu"));
+        menu.setPriceFac(rs.getInt("price_fac"));
         return menu;
     }
 }
