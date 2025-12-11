@@ -92,10 +92,12 @@ public class PaymentController {
         boolean success = paymentDAO.insertPayment(request);
 
         if (success) {
-            // 성공 시, 추가금 등의 메시지를 보낼 수도 있지만 여기선 성공 코드만 리턴
-            return new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, null);
+            LocalDateTime dbTime = paymentDAO.selectDbTime();
+            if (dbTime != null) {
+                request.setPaymentTime(dbTime);
+            }
+            return new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, request);
         } else {
-            // 결제 내역 저장 실패 시에도 롤백 필요
             if (request.getUsedCouponId() != null && request.getUsedCouponId() > 0) {
                 couponDAO.updateCouponToUnused(request.getUsedCouponId());
             }

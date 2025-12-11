@@ -161,4 +161,18 @@ public class PaymentDAO {
     interface StatementSetter {
         void setValues(PreparedStatement pstmt) throws SQLException;
     }
+
+    public LocalDateTime selectDbTime() {
+        String sql = "SELECT NOW()";
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            if (rs.next()) {
+                return rs.getTimestamp(1).toLocalDateTime();
+            }
+        } catch (SQLException e) {
+            System.err.println("PaymentDAO - 시간 조회 오류: " + e.getMessage());
+        }
+        return null;
+    }
 }

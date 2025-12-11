@@ -18,50 +18,33 @@ public class CouponController {
     private final CouponPolicyDAO couponPolicyDAO = new CouponPolicyDAO();
     private final CouponDAO couponDAO = new CouponDAO();
 
-    /**
-     * [추가됨] 쿠폰 구매 처리
-     * 현재 유효한 정책(가격)을 조회하여 그 가격으로 쿠폰을 생성합니다.
-     */
+    // 쿠폰 구매 처리
+    //현재 유효한 정책(가격)을 조회하여 그 가격으로 쿠폰을 생성합니다.
     public Protocol purchaseCoupons(int userId, int quantity) {
         if (quantity <= 0) {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
         }
 
-        // 1. 현재 적용 가능한 쿠폰 정책 조회
         Optional<CouponPolicyDTO> policyOpt = couponPolicyDAO.findCurrentPolicy();
-        int currentPrice;
+        int currentPrice = policyOpt.isPresent() ? policyOpt.get().getCouponPrice() : 5000;
 
-        if (policyOpt.isPresent()) {
-            currentPrice = policyOpt.get().getCouponPrice();
-        } else {
-            // 정책이 없으면 기본값 설정 혹은 에러 처리 (여기선 예시로 5000원)
-            currentPrice = 5000;
-        }
-
-        // 2. 쿠폰 생성 (메모리 상)
         List<CouponDTO> newCoupons = new ArrayList<>();
-        LocalDateTime now = LocalDateTime.now();
 
         for (int i = 0; i < quantity; i++) {
             CouponDTO coupon = new CouponDTO();
             coupon.setUserId(userId);
-            coupon.setPurchaseDate(now);
-            coupon.setPurchaseValue(currentPrice); // [중요] 시점의 가격 저장
+            coupon.setPurchaseValue(currentPrice);
             coupon.setUsed(false);
             newCoupons.add(coupon);
         }
 
-        // 3. DB 저장
         boolean success = couponDAO.insertCoupons(newCoupons);
-
         return success
                 ? new Protocol(ProtocolType.RESULT, ProtocolCode.SUCCESS, null)
                 : new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
     }
 
-    /**
-     * [추가됨] 사용자의 잔여 쿠폰 목록 조회
-     */
+    // 사용자의 잔여 쿠폰 목록 조회
     public List<CouponDTO> getMyCoupons(int userId) {
         return couponDAO.findUnusedCouponsByUserId(userId);
     }
@@ -73,10 +56,6 @@ public class CouponController {
     public Protocol upsertCouponPolicy(CouponPolicyDTO policy) {
         if (!isValid(policy)) {
             return new Protocol(ProtocolType.RESULT, ProtocolCode.FAIL, null);
-        }
-
-        if (policy.getEffectiveDate() == null) {
-            policy.setEffectiveDate(LocalDateTime.now());
         }
 
         boolean success = couponPolicyDAO.insertPolicy(policy);
