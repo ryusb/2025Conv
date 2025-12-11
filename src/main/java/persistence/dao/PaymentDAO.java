@@ -70,6 +70,46 @@ public class PaymentDAO {
         });
     }
 
+    // 식당별 + 특정 연/월 결제 내역 조회
+    public List<PaymentDTO> findHistoryByRestaurantIdAndDate(int restaurantId, int year, int month) {
+        // YEAR()와 MONTH() 함수를 사용하여 날짜 필터링
+        String sql = "SELECT * FROM payment WHERE restaurant_id = ? " +
+                "AND YEAR(payment_time) = ? AND MONTH(payment_time) = ? " +
+                "ORDER BY payment_time DESC";
+
+        return getPaymentList(sql, pstmt -> {
+            pstmt.setInt(1, restaurantId);
+            pstmt.setInt(2, year);
+            pstmt.setInt(3, month);
+        });
+    }
+
+    // 특정 연/월 식당별 매출 현황
+    public Map<String, Long> getSalesStatsByRestaurantAndDate(int year, int month) {
+        Map<String, Long> stats = new HashMap<>();
+        String sql = "SELECT restaurant_name, SUM(coupon_value_used + additional_card_amount) as total_sales " +
+                "FROM payment " +
+                "WHERE status <> '실패' " +
+                "AND YEAR(payment_time) = ? AND MONTH(payment_time) = ? " +
+                "GROUP BY restaurant_name";
+
+        try (Connection conn = DBConnectionManager.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setInt(1, year);
+            pstmt.setInt(2, month);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    stats.put(rs.getString("restaurant_name"), rs.getLong("total_sales"));
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("PaymentDAO - 월별 매출 현황 오류: " + e.getMessage());
+        }
+        return stats;
+    }
+
     // [공통] ResultSet -> PaymentDTO 변환 및 리스트 반환 헬퍼 메서드
     private List<PaymentDTO> getPaymentList(String sql, StatementSetter setter) {
         List<PaymentDTO> list = new ArrayList<>();

@@ -258,14 +258,28 @@ public class ClientHandler extends Thread {
                     return couponController.upsertCouponPolicy((CouponPolicyDTO) req.getData());
 
                 case ProtocolCode.ORDER_PAYMENT_HISTORY_REQUEST: { // 0x17
-                    // 식당별 결제 내역 (클라이언트에서 식당ID 전송 가정)
-                    int restaurantId = (int) req.getData();
-                    List<PaymentDTO> list = paymentDAO.findHistoryByRestaurantId(restaurantId);
+                    // 클라이언트가 보낸 Map {restaurantId, year, month} 받기
+                    @SuppressWarnings("unchecked")
+                    Map<String, Integer> reqData = (Map<String, Integer>) req.getData();
+
+                    int restaurantId = reqData.get("restaurantId");
+                    int year = reqData.get("year");
+                    int month = reqData.get("month");
+
+                    List<PaymentDTO> list = paymentDAO.findHistoryByRestaurantIdAndDate(restaurantId, year, month);
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.ORDER_PAYMENT_HISTORY_RESPONSE, list);
                 }
 
                 case ProtocolCode.SALES_REPORT_REQUEST: { // 0x18
-                    Map<String, Long> sales = paymentDAO.getSalesStatsByRestaurant();
+                    // 클라이언트가 보낸 Map {year, month} 받기
+                    @SuppressWarnings("unchecked")
+                    Map<String, Integer> reqData = (Map<String, Integer>) req.getData();
+
+                    int year = reqData.get("year");
+                    int month = reqData.get("month");
+
+                    // 연도와 월을 조건으로 조회하는 DAO 메서드 호출
+                    Map<String, Long> sales = paymentDAO.getSalesStatsByRestaurantAndDate(year, month);
                     return new Protocol(ProtocolType.RESPONSE, ProtocolCode.SALES_REPORT_RESPONSE, sales);
                 }
 

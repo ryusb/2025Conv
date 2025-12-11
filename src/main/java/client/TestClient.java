@@ -729,27 +729,72 @@ public class TestClient {
 
     // 0x17: 주문 결제 내역 조회
     private static void testOrderPaymentHistory() throws IOException {
-        System.out.println("\n[관리자: 식당별 결제 내역 조회]");
-        System.out.print("식당 ID: ");
-        int rId = getIntInput();
-        send(new Protocol(ProtocolType.REQUEST, ProtocolCode.ORDER_PAYMENT_HISTORY_REQUEST, rId));
+        System.out.println("\n[관리자: 식당별 월별 결제 내역 조회]");
 
+        // 1. 식당 선택 (기존 로직 활용)
+        RestaurantDTO r = selectRestaurant();
+        if (r == null) return;
+
+        // 2. 날짜 입력
+        System.out.print("조회할 연도(YYYY): ");
+        int year = getIntInput();
+        System.out.print("조회할 월(MM): ");
+        int month = getIntInput();
+
+        // 3. 데이터 구성 (Map)
+        Map<String, Integer> reqData = new HashMap<>();
+        reqData.put("restaurantId", r.getRestaurantId());
+        reqData.put("year", year);
+        reqData.put("month", month);
+
+        send(new Protocol(ProtocolType.REQUEST, ProtocolCode.ORDER_PAYMENT_HISTORY_REQUEST, reqData));
+
+        // 4. 응답 처리
         Protocol res = receive();
-        if(res.getCode() == ProtocolCode.ORDER_PAYMENT_HISTORY_RESPONSE) {
+        if (res.getCode() == ProtocolCode.ORDER_PAYMENT_HISTORY_RESPONSE) {
             List<PaymentDTO> list = (List<PaymentDTO>) res.getData();
-            System.out.println("📜 결제 내역 (" + list.size() + "건):");
-            for(PaymentDTO p : list) System.out.println("- " + p.getMenuName() + ", " + p.getMenuPriceAtTime() + "원");
-        } else printFail(res);
+            System.out.println("\n📜 [" + r.getName() + "] " + year + "년 " + month + "월 결제 내역 (" + list.size() + "건):");
+
+            if (list.isEmpty()) {
+                System.out.println("   (해당 기간의 결제 내역이 없습니다.)");
+            } else {
+                for (PaymentDTO p : list) {
+                    System.out.printf("- [%s] %s : %d원 (%s)\n",
+                            p.getPaymentTime(), p.getMenuName(), p.getMenuPriceAtTime(), p.getStatus());
+                }
+            }
+        } else {
+            printFail(res);
+        }
     }
 
     // 0x18: 매출 현황
     private static void testSalesReport() throws IOException {
-        send(new Protocol(ProtocolType.REQUEST, ProtocolCode.SALES_REPORT_REQUEST, null));
+        System.out.println("\n[관리자: 월별 매출 현황 조회]");
+        System.out.print("조회할 연도(YYYY): ");
+        int year = getIntInput();
+        System.out.print("조회할 월(MM): ");
+        int month = getIntInput();
+
+        Map<String, Integer> reqData = new HashMap<>();
+        reqData.put("year", year);
+        reqData.put("month", month);
+
+        send(new Protocol(ProtocolType.REQUEST, ProtocolCode.SALES_REPORT_REQUEST, reqData));
+
         Protocol res = receive();
-        if(res.getCode() == ProtocolCode.SALES_REPORT_RESPONSE) {
+        if (res.getCode() == ProtocolCode.SALES_REPORT_RESPONSE) {
             Map<String, Long> sales = (Map<String, Long>) res.getData();
-            System.out.println("💰 식당별 매출: " + sales);
-        } else printFail(res);
+            System.out.println("\n💰 " + year + "년 " + month + "월 식당별 매출:");
+
+            if (sales == null || sales.isEmpty()) {
+                System.out.println("   (매출 데이터가 없습니다)");
+            } else {
+                sales.forEach((k, v) -> System.out.printf("   - %s: %,d원\n", k, v));
+            }
+        } else {
+            printFail(res);
+        }
     }
 
     // 0x19: 이용 현황
