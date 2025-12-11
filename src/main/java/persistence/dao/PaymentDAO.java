@@ -241,7 +241,7 @@ public class PaymentDAO {
             String lower = trimmed.toLowerCase();
             switch (lower) {
                 case "stdcafeteria":
-                case "stucafeteria":
+                case "stuCafeteria":
                 case "학생식당":
                     return "학생식당";
                 case "faccafeteria":
