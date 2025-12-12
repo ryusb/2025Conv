@@ -623,8 +623,8 @@ public class TestClient {
         if(r == null) return;
 
         MenuPriceDTO m = new MenuPriceDTO();
-        System.out.print("식당 ID(1: 학생식당 /2: 교직원식당 /3: 분식당): "); m.setRestaurantId(getIntInput());
-        System.out.print("식당 이름(학생식당: stdCafeteria/교직원식당: facCafeteria/분식당: snack)"); m.setRestaurantName(sc.nextLine());
+        m.setRestaurantId(r.getRestaurantId());
+        m.setRestaurantName(r.getName());
         System.out.print("메뉴명: "); m.setMenuName(sc.nextLine());
 
         // 시간대 선택 (분식이면 자동 상시, 아니면 선택)
